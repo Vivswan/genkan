@@ -15,7 +15,7 @@
 | `genkan doctor --paths` | read-only diagnostics | Prints the runtime dir and lock path this environment resolves to, creating neither. |
 | `genkan doctor --fix` | repair / install | Registers (or re-registers) this binary as the native-messaging host for your account. The only mutating form of doctor. |
 | `genkan doctor --fix --system` | repair / install (root) | The same, machine-wide: into the root-owned directories every account's browser reads. What the `.deb` runs after install. |
-| `genkan uninstall [--system \| --manifest-dir <dir>...]` | removal | Removes exactly the registrations this project wrote in that scope, nothing else. |
+| `genkan uninstall [--system \| (--manifest-dir <dir>)...]` | removal | Removes exactly the registrations this project wrote in that scope, nothing else. |
 | `genkan pair [--reset] [--file-store]` | enrollment | Mints the host key the extension pins, behind a confirmation typed on the terminal; the key lives in the OS credential store, or in a 0600 file with `--file-store`. |
 | `genkan revoke <browser>` | enrollment | Forgets that browser's enrolled authenticators; no proof needed, the browser enrolls again from its options page. |
 | `genkan revoke --all` | enrollment | Starts over: deletes the host key and the signed policy baseline, forgets every browser and every trusted client. A bare `revoke` is refused with the usage. |

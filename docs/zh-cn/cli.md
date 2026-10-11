@@ -15,7 +15,7 @@
 | `genkan doctor --paths` | 只读诊断 | 打印当前环境解析出的运行时目录与锁文件路径, 两者都不会创建。 |
 | `genkan doctor --fix` | 修复 / 安装 | 为你的账户把这个二进制注册 (或重新注册) 为原生消息主机。doctor 唯一会写入的形式。 |
 | `genkan doctor --fix --system` | 修复 / 安装 (root) | 同样的操作, 但是机器级的: 写入每个账户的浏览器都会读取的、归 root 所有的目录。`.deb` 安装后运行的就是它。 |
-| `genkan uninstall [--system \| --manifest-dir <dir>...]` | 移除 | 只移除本项目在该作用域写入的注册, 不动其他任何东西。 |
+| `genkan uninstall [--system \| (--manifest-dir <dir>)...]` | 移除 | 只移除本项目在该作用域写入的注册, 不动其他任何东西。 |
 | `genkan pair [--reset] [--file-store]` | 登记 | 在终端键入确认之后, 生成扩展所固定的主机密钥; 密钥保存在操作系统的凭据存储中, 或在使用 `--file-store` 时保存在一个 0600 文件里。 |
 | `genkan revoke <browser>` | 登记 | 忘记该浏览器已登记的认证器; 不需要证明, 该浏览器可从其选项页重新登记。 |
 | `genkan revoke --all` | 登记 | 从头来过: 删除主机密钥与签名的策略基线, 忘记每一个浏览器和每一个受信任客户端。不带参数的 `revoke` 会被拒绝并显示用法。 |

@@ -15,7 +15,7 @@
 | `genkan doctor --paths` | 唯讀診斷 | 印出此環境解析出的執行階段目錄與鎖定檔路徑, 兩者都不建立。 |
 | `genkan doctor --fix` | 修復 / 安裝 | 為你的帳戶將此執行檔註冊 (或重新註冊) 為原生訊息主機。doctor 唯一會修改狀態的形式。 |
 | `genkan doctor --fix --system` | 修復 / 安裝 (root) | 同樣的動作, 但是機器層級: 寫入每個帳戶的瀏覽器都會讀取的、由 root 擁有的目錄。`.deb` 安裝後執行的就是它。 |
-| `genkan uninstall [--system \| --manifest-dir <dir>...]` | 移除 | 只移除本專案在該範圍寫入的註冊, 別無其他。 |
+| `genkan uninstall [--system \| (--manifest-dir <dir>)...]` | 移除 | 只移除本專案在該範圍寫入的註冊, 別無其他。 |
 | `genkan pair [--reset] [--file-store]` | 登記 | 在終端機輸入確認之後, 產生擴充功能所固定的主機金鑰; 金鑰存放在作業系統的憑證存放區, 或在使用 `--file-store` 時存放在一個 0600 檔案中。 |
 | `genkan revoke <browser>` | 登記 | 忘記該瀏覽器已登記的認證器; 不需要證明, 該瀏覽器可從其選項頁面重新登記。 |
 | `genkan revoke --all` | 登記 | 從頭來過: 刪除主機金鑰與已簽署的策略基準, 忘記每一個瀏覽器與每一個受信任用戶端。不帶引數的 `revoke` 會被拒絕並顯示用法。 |
