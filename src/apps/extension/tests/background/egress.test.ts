@@ -1,3 +1,4 @@
+// tier: pr
 // Egress masking audit: for BOTH page backends the masking happens once, in
 // the SW (egress.ts), so these tables cover every path a page-derived secret
 // could take out of the extension: storage_get values (always masked, with

@@ -1,3 +1,4 @@
+// tier: pr
 use super::command::{browser_targets, fix_exit_code, select_targets, uninstall_exit_code};
 #[cfg(unix)]
 use super::files::launchable_by_every_account;

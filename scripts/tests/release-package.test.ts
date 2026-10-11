@@ -1,3 +1,4 @@
+// tier: pr
 import { afterAll, afterEach, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";

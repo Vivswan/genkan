@@ -1,3 +1,4 @@
+// tier: pr
 // The confirmation payload union: each kind carries exactly its own fields, so
 // the combinations the service never produces are PARSE errors at the window's
 // trust boundary, not rendering decisions. The type-level side is pinned with a

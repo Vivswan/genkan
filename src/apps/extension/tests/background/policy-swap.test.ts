@@ -1,3 +1,4 @@
+// tier: pr
 // Every enforcement call site reads the per-decision policy snapshot. Each
 // site gets one post-cutover DENY and one post-cutover GRANT test, so a test
 // can only pass if the site reads the applied policy rather than the deny

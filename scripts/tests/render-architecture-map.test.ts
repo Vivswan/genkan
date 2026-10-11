@@ -1,3 +1,4 @@
+// tier: pr
 import { afterEach, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";

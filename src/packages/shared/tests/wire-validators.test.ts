@@ -1,3 +1,4 @@
+// tier: pr
 // The generated wire validators (generated/envelope.ts), exercised adversarially: hostile frames - unknown fields,
 // missing required fields, type confusion, nested extras - must all be refused by the faithful base AND by the
 // enforced validator the extension runs, and nothing may be silently defaulted. This is the runtime proof that

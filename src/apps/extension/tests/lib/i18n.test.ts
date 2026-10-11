@@ -1,3 +1,4 @@
+// tier: pr
 // The runtime i18n: BCP-47 resolution, the seq-guarded async swap, and the
 // English fallback. fetch is stubbed per locale so no _locales build is needed.
 

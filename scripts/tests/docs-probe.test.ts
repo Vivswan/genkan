@@ -1,3 +1,4 @@
+// tier: pr
 import { afterEach, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { readFileSync, realpathSync, symlinkSync } from "node:fs";

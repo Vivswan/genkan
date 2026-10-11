@@ -94,7 +94,7 @@ moon run fix       # auto-fix everything: biome check --write + cargo fmt
 | Contract | `check-envelope`, `check-gen-isolation` |
 | Workflows | `check-yaml`, `check-actions` |
 
-CI runs more on top: the macOS and Windows rust matrices, coverage, linux-install, the adversarial and chaos suites, the interop suite, the browser suites, the installers, the web build, and the audits (the [CI layout](#ci-layout) below).
+CI runs more on top: the macOS and Windows rust matrices, coverage, linux-install, the interop suite, the browser suites, the web build, and the audits on every pull request, and the release gate (the adversarial and chaos suites, the harness smoke, the installers) on the release PR and every night (the [CI layout](#ci-layout) below).
 
 The root `package.json` scripts are thin aliases, so both entry points share one implementation:
 
@@ -195,7 +195,9 @@ uv is pinned only in `.prototools`, and python is owned by uv: the protocol suit
 
 ## CI layout
 
-`checks.yml` defines each concern once, called by the managed ci.yml inside the all-green gate. Every job runs on a GitHub-hosted runner, already isolated, so CI never uses the container; the Toolchain pinning section above says how a job provisions its tools, and `.github/actions/workspace-deps` installs the bun workspace and fetches the crates for the jobs whose moon tasks build the generated contract modules.
+`checks.yml` is the `pr` tier ([tests/README.md](../tests/README.md#tiers)): what runs on every pull request and push to main, each concern defined once and called by the managed ci.yml inside the all-green gate.
+
+Every job runs on a GitHub-hosted runner, already isolated, so CI never uses the container; the Toolchain pinning section above says how a job provisions its tools, and `.github/actions/workspace-deps` installs the bun workspace and fetches the crates for the jobs whose moon tasks build the generated contract modules.
 
 | Job | Runs | Where |
 |-----|------|-------|
@@ -206,11 +208,19 @@ uv is pinned only in `.prototools`, and python is owned by uv: the protocol suit
 | `tooling` | `machete`, with cargo-machete at the `Containerfile` pin | ubuntu runner |
 | `web` | `web:build` | ubuntu runner |
 | `linux-install` | downloads the `build-release` binary, then `scripts/linux-registration.ts`: `doctor --fix`, re-register, multi-browser, `uninstall` under isolated HOME and XDG directories | ubuntu runner, with cargo and moon to build the generated identity module the scenario driver reads |
-| `protocol` | the `e2e`, `adversarial`, and `chaos` suites against the downloaded binary | ubuntu runner |
+| `protocol` | the `e2e` suite against the downloaded binary | ubuntu runner |
 | `interop` | the official MCP SDK client against the downloaded binary | ubuntu runner |
 | `browser` | the reusable `browser.yml` (input `chrome-version`), which `nightly.yml` calls too | ubuntu runner, Chrome from `setup-chrome` |
-| `installers` | `installers.yml` builds the .pkg, .deb, and .msi and installs each on its runner | each platform's runner |
 | `audits` | `audits.yml`: cargo deny over the root and fuzz workspaces | ubuntu runner |
+
+`release-gate.yml` is the `release-gate` tier: the managed ci.yml calls it on the release PR and on a dispatch, where all-green blocks on it, and `nightly.yml` calls it on the schedule, so a regression there shows the next morning and blocks the release rather than every merge.
+
+| Job | Runs | Where |
+|-----|------|-------|
+| `build-release` | `moon run build-release`, uploaded under its own artifact name for the suites below | ubuntu runner |
+| `protocol` | the `adversarial` and `chaos` suites against the downloaded binary | ubuntu runner |
+| `harness-smoke` | `tests/harness/run.ts --require-any` with the current Claude Code and Codex releases installed unpinned; the captures are the run's artifact | ubuntu runner |
+| `installers` | `installers.yml` builds the .pkg, .deb, and .msi and installs each on its runner | each platform's runner |
 
 `container-build.yml` is the one place CI touches Docker: it builds the `Containerfile` without pushing, only on a pull request or main push that changes the `Containerfile`, `.dockerignore`, `compose.yaml`, `compose.podman.yaml`, `.prototools`, `rust-toolchain.toml`, or the workflow itself. It is not in all-green's needs, so its skip on every other change costs nothing.
 
@@ -228,7 +238,7 @@ Load `build/extension/chrome-mv3` as an unpacked extension in `chrome://extensio
 
 ## Testing
 
-The protocol suites (`tests/protocol/e2e.py`, `adversarial.py`, `chaos.py`) drive the real release binary as subprocesses over the actual wire protocols, no browser needed: `moon run test-e2e` (in the gate), `test-adversarial`, `test-chaos`.
+The protocol suites (`tests/protocol/e2e.py`, `adversarial.py`, `chaos.py`) drive the real release binary as subprocesses over the actual wire protocols, no browser needed: `moon run test-e2e` (in the gate), `test-adversarial` and `test-chaos` (the release gate).
 
 The browser suites listed in `tests/browser/run_all.ts` share one runner, which CI's `browser.yml`, the container, and `moon run test-browser` all invoke. It builds the extension, runs those suites, then checks that each left its RAN marker. The last row below runs apart:
 
@@ -331,7 +341,7 @@ The smoke needs a nightly toolchain plus `cargo install cargo-fuzz`, and skips w
 - Locally each target gets 30 seconds. The nightly run gives 120 seconds per target and passes `--cmin`, which minimizes each passing target's corpus before the cache save (cmin bounds each snapshot's size; GitHub's LRU cache eviction bounds the number of snapshots).
 - For a real campaign on one target, `cargo +nightly fuzz run <target>` from `src/packages/core` runs unbounded.
 
-The nightly job lives in `.github/workflows/nightly-fuzz.yml`, this repository's instance of the fleet's fuzzer-module starter. Browser and mutation testing stay in `nightly.yml`, which files the same lifecycle under its own `nightly-failure` label with no failure artifacts, so its issue points at the run log.
+The nightly job lives in `.github/workflows/nightly-fuzz.yml`, this repository's instance of the fleet's fuzzer-module starter. Browser and mutation testing, and the nightly rerun of the release gate, stay in `nightly.yml`, which files the same lifecycle under its own `nightly-failure` label with no failure artifacts, so its issue points at the run log.
 
 - Red night: uploads `fuzz/artifacts/` and `fuzz/failures/` as the `fuzz-failures-<attempt>` artifact, files or updates the `fuzz-nightly` tracking issue from the reports, and dispatches auto-assign at it.
 - Green night: closes the open issue.

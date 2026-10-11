@@ -1,3 +1,4 @@
+// tier: pr
 // The worker half of the WebAuthn ceremonies over a fake Connection: request/reply correlation, the
 // fail-closed timeout and detach, the unsolicited-frame drops, and the pushed presence request's lifecycle.
 // The host side is the Rust verifier's own tests; the tag roster itself is held to the generated table by

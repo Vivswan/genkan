@@ -1,3 +1,4 @@
+// tier: pr
 // evalResponseToPayload normalizes a raw Runtime.evaluate response into the
 // page_eval result shape. Masking of both paths (value and exception) happens
 // downstream in egress.ts - see tests/background/egress.test.ts.

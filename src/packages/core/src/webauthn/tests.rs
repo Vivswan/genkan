@@ -1,3 +1,4 @@
+// tier: pr
 //! Hand-authored vectors: a fixed test scalar signs over byte strings built here to the WebAuthn layouts, so
 //! every check has one input that trips exactly it. Nothing is captured from a real authenticator.
 

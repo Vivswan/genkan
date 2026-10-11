@@ -1,3 +1,4 @@
+// tier: pr
 import { PINNED_EXTENSION_ID } from "@genkan/shared/generated/identity";
 import { describe, expect, test } from "vitest";
 import { diagnoseExtensionId } from "@/lib/shared/extension-id";

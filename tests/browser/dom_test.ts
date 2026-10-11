@@ -1,3 +1,4 @@
+// tier: pr
 /**
  * DOM-layer tests for src/apps/extension/content.js - runs the REAL content.js source
  * against a real headless Chrome page via the DevTools Protocol.

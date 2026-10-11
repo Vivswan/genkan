@@ -1,3 +1,4 @@
+// tier: pr
 import { describe, expect, test } from "vitest";
 import { assertNotDisabled } from "@/lib/background/dispatch";
 

@@ -2,6 +2,8 @@ name: Nightly checks
 
 # Scheduled, never PR-gating: each job is too slow for a PR, depends on the outside world, or reruns a PR-time
 # check against that day's world, so a quiet repository still learns about a break. Fuzzing is nightly-fuzz.yml.
+# The release-gate job reruns the tier the release PR blocks on, so a regression there is known the next morning
+# rather than at the release.
 #
 # The report job is the fleet's nightly module (repo-platform docs/nightly.md): one label-deduplicated
 # `nightly-failure` issue, filed or updated on a red night and closed on a green one. The fuzz stream keeps its
@@ -65,47 +67,10 @@ jobs:
           SHARD_TOTAL: ${{ strategy.job-total }}
         run: bun scripts/mutants-shard.ts
 
-  # The captured frames (uploaded green or red) are the run's real output: `--mint-seeds <dir>` turns them into
-  # mcp_jsonrpc fuzz seeds outside the repo. The registry's *-live-fakellm entries additionally drive a full
-  # model-driven tool call per CLI against a local fake LLM backend (tests/harness/fake-llm.ts), so the
-  # whole run needs no secrets.
-  #
-  # The driver is invoked directly (like nightly-fuzz.yml invokes fuzz-smoke.ts): the harness-smoke moon
-  # task is runInCI:false, which moon does not resolve at all when CI=true - the same reason checks.yml's
-  # browser job calls its suites directly.
-  harness-smoke:
-    name: Agent-harness interop smoke (current CLI releases)
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: ./.github/actions/setup-moon
-        with:
-          cargo: "true"
-      - run: cargo build --release
-      # Latest on purpose, not pinned: the whole point of this canary is to
-      # observe what CURRENT harness releases send. Best-effort: a harness
-      # whose install fails is skipped by the driver (continue-on-error marks
-      # the step, not the job); --require-any below keeps an install-failed
-      # (or config-entry-only) run from reading green.
-      - name: Install Claude Code (best-effort, deliberately unpinned)
-        continue-on-error: true
-        run: npm install -g @anthropic-ai/claude-code
-      - name: Install Codex (best-effort, deliberately unpinned)
-        continue-on-error: true
-        run: npm install -g @openai/codex
-      # setup-moon puts proto's npm first on PATH, and that npm installs into proto's node prefix, whose
-      # bin directory is not on PATH; the driver resolves the CLIs by walking PATH alone.
-      - name: Put the global npm bin directory on PATH
-        run: echo "$(npm prefix -g)/bin" >> "$GITHUB_PATH"
-      - name: Harness smoke (fails unless a harness completes a live MCP connection)
-        run: bun tests/harness/run.ts --require-any
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: always()
-        with:
-          name: harness-captures-${{ github.run_attempt }}
-          path: build/harness-captures/
-          if-no-files-found: warn
+  # The tier the release PR blocks on, defined once in release-gate.yml (tests/README.md, "Tiers").
+  release-gate:
+    name: Release gate (scheduled)
+    uses: ./.github/workflows/release-gate.yml
 
   # A job calling a reusable workflow fails if any called job fails, so this
   # one job aggregates the audit legs for the report below.
@@ -121,7 +86,7 @@ jobs:
   # unconditional - a skipped sibling would make this job silently do
   # nothing that night.
   report:
-    needs: [browser, mutants, harness-smoke, audits]
+    needs: [browser, mutants, release-gate, audits]
     if: always()
     runs-on: ubuntu-latest
     # A few gh calls; a hung reporter is the residual silence window, so

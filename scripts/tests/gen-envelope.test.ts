@@ -1,3 +1,4 @@
+// tier: pr
 // The fail-closed rules of scripts/gen-envelope.ts, each shown aborting on an input that would otherwise
 // turn into a WEAKER validator than the Rust contract. The happy paths mirror schemars' real output shapes.
 

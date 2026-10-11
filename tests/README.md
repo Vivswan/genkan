@@ -13,7 +13,7 @@ The test suites span two languages: `protocol/` (python) and the TypeScript suit
 | **Presence exchange** | `browser/presence_exchange_test.ts` | `bun` + puppeteer-core (`moon run test-presence-exchange`) | The WebAuthn exchange end to end: two isolated Chromes against the real release host in control-plane mode, including a policy grant signed from the options page (the host key is minted into the isolated runtime dir through `pair --file-store` on a pseudo-terminal from Python's stdlib pty module, under the same `uv run --no-project --isolated` as the protocol suites). It needs the Rust release build, so it runs apart from `run_all.ts` (`suitesFor` there says why). |
 | **Integration** (opt-in) | `browser/integration_e2e.ts` | `bun` + puppeteer-core | The real chain with nothing mocked - MCP client -> real MCP server -> native host -> real extension -> its enrollment gate -> back. Closes the seam `e2e.py` mocks. |
 | **SDK interop** | `interop/sdk-client.test.ts` | `bun test` (`moon run test-interop`) | Drives the release binary with the OFFICIAL TypeScript MCP client SDK v2, pinned to the modern era (no legacy fallback): proves a real third-party 2026-07-28 client negotiates, lists, and calls against the served protocol. No browser: the empty-bridge `tools/call` asserts the typed in-result error. |
-| **Harness smoke** | `harness/run.ts` | `bun` + harness CLIs (`moon run harness-smoke`) | Real agent-harness CLIs (Claude Code, Codex) connect to the stdio MCP server via ISOLATED config dirs, with every frame captured; prints the opening-method canary that decides when legacy-era support can be deleted. The `*-live-fakellm` entries drive a FULL model-driven tool call through each CLI against a local fake LLM backend (`harness/fake-llm.ts`) - zero credentials, zero model spend. Nightly workflow: the `harness-smoke` job in `nightly.yml`. |
+| **Harness smoke** | `harness/run.ts` | `bun` + harness CLIs (`moon run harness-smoke`) | Real agent-harness CLIs (Claude Code, Codex) connect to the stdio MCP server via ISOLATED config dirs, with every frame captured; prints the opening-method canary that decides when legacy-era support can be deleted. The `*-live-fakellm` entries drive a FULL model-driven tool call through each CLI against a local fake LLM backend (`harness/fake-llm.ts`) - zero credentials, zero model spend. CI: the `harness-smoke` job in `release-gate.yml`. |
 
 The browser suites are TypeScript under bun, matching the extension. The protocol suites stay Python on purpose: a rewrite in TS would remove the independent-implementation value and add nothing. How they run:
 
@@ -26,6 +26,18 @@ The browser suites are TypeScript under bun, matching the extension. The protoco
 - **Re-pinning `protocol/tools_list.json`** (the whole tools/list the catalogue test asserts) after a catalogue change: `uv run --no-project --isolated python protocol/harness.py --capture-tools-list`, then `moon run fmt-ts`. Review the diff: it is the contract change.
 
 The protocol suites and the integration test's MCP leg track the MCP 2026-07-28 migration: modern-era cases speak the stateless protocol (per-request `_meta` protocol-version + client-capabilities keys, `server/discover` discovery), while bare requests on initialize-opened connections still exercise the temporary legacy era (pinned at the `2025-06-18` shapes) until it is removed.
+
+## Tiers
+
+The first line of every test file names when it runs (`// tier: pr`, or `# tier: pr` in Python), before the comment that says what would drift without it. A move cannot change a tier silently, and a census reads one line per file.
+
+| Tier | Runs on | Here |
+|------|---------|------|
+| `pr` | every pull request and push to main: `checks.yml`, inside the all-green gate | the unit suites, `protocol/e2e.py`, the browser suites `browser/run_all.ts` lists, `interop/sdk-client.test.ts`, the driver tests under `scripts/tests` and `harness/run.test.ts` |
+| `release-gate` | the release PR, a manual dispatch, and the nightly schedule: `release-gate.yml` | `protocol/adversarial.py`, `protocol/chaos.py`, the harness smoke (`harness/run.ts`), the installers |
+| `nightly` | the schedule only (`nightly.yml`, `nightly-fuzz.yml`), never a gate | mutation testing, the browser and audit reruns against that day's Chrome and advisory database, fuzzing |
+
+A suite that fits both `pr` and `release-gate` is `release-gate`: `pr` holds only what every merge should wait for. A file no workflow runs carries no tier: `browser/presence_exchange_test.ts` and `browser/integration_e2e.ts` run by hand (`moon run test-presence-exchange`, `moon run test-integration`).
 
 ## ⚠ Safety - never point browser tests at your daily Chrome
 
@@ -50,7 +62,7 @@ bun browser/run_all.ts
 CHROME_BIN="/path/to/chrome" bun browser/run_all.ts   # override Chrome location
 
 # Individually:
-moon run test-e2e            # protocol - no browser needed (also test-adversarial, test-chaos: CI's protocol matrix)
+moon run test-e2e            # protocol - no browser needed (also test-adversarial, test-chaos: the release gate's protocol matrix)
 uv run --no-project --isolated python -m unittest discover -s protocol -p e2e.py -v   # the same suite by hand
 uv run --no-project --isolated python -m unittest discover -s protocol -p e2e.py -k KillSwitch   # one class or test
 bun run --cwd browser test:dom              # DOM      - bun + Chrome

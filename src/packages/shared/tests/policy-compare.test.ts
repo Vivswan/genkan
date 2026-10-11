@@ -1,3 +1,4 @@
+// tier: pr
 // The hand-written policy comparison/fold helpers (policy-compare.ts) must
 // mirror the Rust core's semantics exactly (field_relaxes / fold /
 // zero_top_rank in src/packages/core/src/policy/mod.rs): the extension

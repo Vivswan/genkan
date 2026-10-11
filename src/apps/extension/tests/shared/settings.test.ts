@@ -1,3 +1,4 @@
+// tier: pr
 import { DEFAULTS } from "@genkan/shared/settings";
 import { beforeEach, describe, expect, test } from "vitest";
 import { fakeBrowser } from "wxt/testing/fake-browser";

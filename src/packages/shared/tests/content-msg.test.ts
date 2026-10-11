@@ -1,3 +1,4 @@
+// tier: pr
 // The SW <-> content-script messaging contract, exercised adversarially: the
 // envelope must refuse any page-acting message without its full guard (the
 // confirmation-to-act binding), and the reply envelope must refuse anything

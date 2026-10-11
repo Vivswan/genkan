@@ -12,6 +12,10 @@
 # Full history (fetch-depth: 0) on every job that runs moon: in a pull request, `moon run` diffs HEAD against
 # GITHUB_BASE_REF even without --affected, and that `git diff main HEAD` fails when `main` is unknown, as in
 # a depth-1 checkout.
+#
+# This is the `pr` tier (tests/README.md, "Tiers"): what runs on every pull request and push to main. The
+# release-gate tier is release-gate.yml, which the managed ci.yml calls on the release PR and nightly.yml on
+# the schedule; nothing here calls it.
 
 name: Checks
 
@@ -158,18 +162,14 @@ jobs:
       - name: Explicit multi-browser selection, --all, and full uninstall
         run: bun scripts/linux-registration.ts multi-browser
 
-  # The suites hardcode target/release/genkan and build it only when missing, so the downloaded
-  # binary is the one they drive. --upstream none skips the task's build-release dep (the artifact stands in
-  # for it).
+  # The e2e suite over the real wire protocols; the adversarial and chaos suites are release-gate.yml's. The
+  # suite hardcodes target/release/genkan and builds it only when missing, so the downloaded binary is the one
+  # it drives. --upstream none skips the task's build-release dep (the artifact stands in for it).
   protocol:
-    name: Protocol suite (${{ matrix.suite }}, Python)
+    name: Protocol suite (e2e, Python)
     needs: build-release
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        suite: [e2e, adversarial, chaos]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -178,11 +178,11 @@ jobs:
       - uses: ./.github/actions/release-binary
         with:
           mode: download
-      - run: moon run test-${{ matrix.suite }} --upstream none
+      - run: moon run test-e2e --upstream none
 
   # moon does not resolve runInCI:false tasks when CI=true, and test-interop, test-browser, and harness-smoke
   # keep that flag so affected-only `moon ci` runs never need the release binary or a browser; CI invokes
-  # those suites' commands directly (here, browser.yml, nightly.yml).
+  # those suites' commands directly (here, browser.yml, release-gate.yml).
   interop:
     name: MCP SDK v2 client interop (bun)
     needs: build-release
@@ -202,14 +202,6 @@ jobs:
     uses: ./.github/workflows/browser.yml
     with:
       chrome-version: stable
-
-  # On every PR: the managed all-green aggregate allows a skip of `checks` alone, so a path-filtered skip
-  # here would fail it.
-  installers:
-    name: Installers
-    uses: ./.github/workflows/installers.yml
-    permissions:
-      contents: read
 
   # Build-only: the deploy is the managed ci.yml's site leg, which runs .github/actions/site-build and
   # renders docs/ beside it.

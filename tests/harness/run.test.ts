@@ -1,3 +1,4 @@
+// tier: pr
 import { expect, test } from "bun:test";
 import { spawn, spawnSync } from "node:child_process";
 import {

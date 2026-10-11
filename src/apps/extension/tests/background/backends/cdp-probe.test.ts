@@ -1,3 +1,4 @@
+// tier: pr
 // The CDP backend's probeClick receive boundary: the MAIN-world eval result
 // is parsed with ClickProbeSchema (fail closed) before it can feed the risk
 // decision / confirmation / click binding, rather than being cast straight

@@ -1,3 +1,4 @@
+// tier: pr
 use super::*;
 
 /// A test generation; panics on 0, which is exactly the point -- a real

@@ -1,3 +1,4 @@
+# tier: release-gate
 """Adversarial break-in regression suite for genkan.
 
 The socket-level attacker's view: a hostile same-user process that connects

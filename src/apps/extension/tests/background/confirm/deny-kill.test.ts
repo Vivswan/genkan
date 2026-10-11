@@ -1,3 +1,4 @@
+// tier: pr
 // The confirm window's panic exit: confirm_deny_kill denies every pending
 // confirmation AND engages the kill switch in one SW-side step. The property
 // that must hold under any interleaving: by the time the kill_engage frame is

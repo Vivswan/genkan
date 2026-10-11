@@ -1,3 +1,4 @@
+// tier: pr
 // The extension half of the kill switch. Pins the properties the design leans
 // on:
 // - the gate's fail-closed matrix over the SW-only mirror (absent allows,

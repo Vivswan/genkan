@@ -1,3 +1,4 @@
+// tier: pr
 // The cancel leg of the bridge contract as the extension sees it (dispatch.ts): the server's `cancel` signal
 // for an id the extension holds ends that request as `cancelled`, which port.ts posts nothing for, whether the
 // cancel lands while the request waits for admission, before its op, or while the op runs (its late result or

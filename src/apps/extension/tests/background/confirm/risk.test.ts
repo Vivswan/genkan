@@ -1,3 +1,4 @@
+// tier: pr
 import { describe, expect, test } from "vitest";
 import { describeAction, describeTarget, isHighRiskClick } from "@/lib/background/confirm/risk";
 import type { ClickProbe } from "@/lib/dom/page-api";

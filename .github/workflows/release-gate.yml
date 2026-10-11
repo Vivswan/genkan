@@ -1,19 +1,103 @@
-# Runs this repository's release acceptance tests: the tier that is critical for a release but need not run on every
-# merge (slow, environment-heavy, or network-bound). The managed ci.yml calls it on the release PR and on a dispatch,
-# where all-green blocks on it; the nightly starter calls it on the schedule (docs/all-green.md, "The release-gate hook").
+# The release-gate tier: what qualifies a release but need not run on every merge (tests/README.md, "Tiers").
+# The managed ci.yml calls this on the release PR and on a dispatch, where all-green blocks on it; nightly.yml
+# calls it on the schedule and folds its result into the nightly issue. Nothing else calls it: a second caller
+# in one run would run every job twice.
 #
-# This file is repo-owned, seeded once by the fleet sync and never overwritten by a later sync.
-#
-# Replace the no-op job with this repository's tiers; the caller grants no secrets and caps at contents: read.
+# The caller grants no secrets and caps permissions at contents: read, so no job here may need more.
 
-name: Release Gate
+name: Release gate
 
 on:
   workflow_call:
 
+permissions:
+  contents: read
+
 jobs:
-  noop:
+  # Built once; the suites below download it (.github/actions/release-binary). Its own artifact name: on the
+  # release PR checks.yml uploads its build in the same run, and a second upload under one name fails.
+  build-release:
+    name: Release binary (Linux)
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 20
     steps:
-      - run: echo "release-gate hook - nothing configured"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-moon
+        with:
+          cargo: "true"
+      - run: moon run build-release
+      - uses: ./.github/actions/release-binary
+        with:
+          mode: upload
+          artifact: genkan-linux-release-gate
+
+  # The hostile-peer and fault-injection suites; the e2e suite is checks.yml's. The suites hardcode
+  # target/release/genkan and build it only when missing, so the downloaded binary is the one they drive.
+  # --upstream none skips the task's build-release dep (the artifact stands in for it).
+  protocol:
+    name: Protocol suite (${{ matrix.suite }}, Python)
+    needs: build-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [adversarial, chaos]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-moon
+      - uses: ./.github/actions/release-binary
+        with:
+          mode: download
+          artifact: genkan-linux-release-gate
+      - run: moon run test-${{ matrix.suite }} --upstream none
+
+  # The *-live-fakellm entries drive a full model-driven tool call per CLI against a local fake LLM backend
+  # (tests/harness/fake-llm.ts), so the whole run needs no secrets. The driver is invoked directly: the
+  # harness-smoke moon task is runInCI:false, which moon does not resolve at all when CI=true. It builds
+  # target/release/genkan only when it is missing, so it drives the downloaded binary.
+  harness-smoke:
+    name: Agent-harness interop smoke (current CLI releases)
+    needs: build-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-moon
+        with:
+          cargo: "true"
+      - uses: ./.github/actions/release-binary
+        with:
+          mode: download
+          artifact: genkan-linux-release-gate
+      # Latest on purpose, not pinned: the canary observes what CURRENT harness releases send. A harness whose
+      # install fails is skipped by the driver; --require-any below keeps such a run from reading green.
+      - name: Install Claude Code (best-effort, deliberately unpinned)
+        continue-on-error: true
+        run: npm install -g @anthropic-ai/claude-code
+      - name: Install Codex (best-effort, deliberately unpinned)
+        continue-on-error: true
+        run: npm install -g @openai/codex
+      # setup-moon puts proto's npm first on PATH, and that npm installs into proto's node prefix, whose
+      # bin directory is not on PATH; the driver resolves the CLIs by walking PATH alone.
+      - name: Put the global npm bin directory on PATH
+        run: echo "$(npm prefix -g)/bin" >> "$GITHUB_PATH"
+      - name: Harness smoke (fails unless a harness completes a live MCP connection)
+        run: bun tests/harness/run.ts --require-any
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: harness-captures-${{ github.run_attempt }}
+          path: build/harness-captures/
+          if-no-files-found: warn
+
+  # The .pkg, .deb and .msi update-release.yml will build, each installed on its platform's runner.
+  installers:
+    name: Installers
+    uses: ./.github/workflows/installers.yml
+    permissions:
+      contents: read

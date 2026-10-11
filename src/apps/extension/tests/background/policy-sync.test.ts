@@ -1,3 +1,4 @@
+// tier: pr
 // The extension's policy consumption core (policy-sync.ts), signed lane and snapshot rule: the golden
 // vectors (Rust-signed baselines) replay through the real WebCrypto verify -> strict parse -> ratchet ->
 // storage path, and crafted documents are signed by an in-test key playing the pinned Enclave key. The

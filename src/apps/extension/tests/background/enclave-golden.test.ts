@@ -1,3 +1,4 @@
+// tier: pr
 // Golden-vector replay: the cross-language enclave crypto contract, pinned.
 //
 // The fixture ("@genkan/shared/generated/enclave-fixture") is

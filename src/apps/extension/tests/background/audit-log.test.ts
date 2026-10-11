@@ -1,3 +1,4 @@
+// tier: pr
 // The forwarding half of the extension audit ring: whether an event reaches the
 // host's durable trail is a property of its KIND alone. The per-call `forward`
 // flag is gone - a call site must not be able to suppress forensic evidence for

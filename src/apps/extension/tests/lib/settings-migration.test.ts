@@ -1,3 +1,4 @@
+// tier: pr
 // The settings ladder. The floor, not the rung count, fixes which rung a stored
 // version climbs: the control is one hand-authored ladder with its first rung
 // retired, reading the same v2 store right with the floor raised and wrong

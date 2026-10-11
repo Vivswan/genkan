@@ -1,3 +1,4 @@
+// tier: pr
 //! The two disposal seams side by side: the host-key-only one every `pair --reset` and extension revoke runs
 //! through, and `revoke --all`'s, which also forgets every pairing. A test build's credential store always
 //! answers empty, so the key under test is the file key.

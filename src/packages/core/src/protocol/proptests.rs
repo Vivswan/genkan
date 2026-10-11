@@ -1,3 +1,4 @@
+// tier: pr
 use super::*;
 use crate::tools::args::{
     ElementTargetArgs, JsInt, NoArgs, PageEvalArgs, PageWaitForArgs, TabTargetArgs,

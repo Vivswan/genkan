@@ -1,3 +1,4 @@
+// tier: pr
 // Sender gating, derived from the contract: the router refuses EVERY declared
 // message from a non-extension-page sender, and every confirm-window message
 // from any other extension page. A content script sends the router nothing,

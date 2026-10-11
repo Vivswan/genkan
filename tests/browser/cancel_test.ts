@@ -1,3 +1,4 @@
+// tier: pr
 /**
  * The cancel signal through Chrome's real native messaging: a stand-in host (fake_host.ts), registered in
  * the throwaway profile, sends the extension a `cancel` for an id and then a bridge request, and the log of

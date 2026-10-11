@@ -1,3 +1,4 @@
+// tier: pr
 import { describe, expect, test } from "bun:test";
 import { auditGraph, GATE, STATIC, type TaskGraph } from "../check-moon-edges";
 

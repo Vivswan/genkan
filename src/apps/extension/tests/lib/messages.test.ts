@@ -1,3 +1,4 @@
+// tier: pr
 // send() is the one place the pages trust the service worker's answer. A
 // transport failure or an answer outside the contract must become the
 // declared refusal arm, never a view rendering a shape it assumed; the

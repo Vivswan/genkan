@@ -1,3 +1,4 @@
+// tier: pr
 // The trusted-client admin exchange, extension side: request/reply correlation
 // over the native-messaging port, the fail-closed timeout, and the
 // unsolicited-frame drops. The host side (allowlist rewrite + epoch bump) is

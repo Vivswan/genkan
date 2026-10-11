@@ -1,3 +1,4 @@
+// tier: pr
 // Frame routing is strict: every host->extension control frame tag in the
 // generated wire table is claimed by exactly one collaborator, and a bridge
 // request by none. port.ts hands a frame to the FIRST collaborator that

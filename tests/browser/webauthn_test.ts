@@ -1,3 +1,4 @@
+// tier: pr
 /**
  * WebAuthn in an ISOLATED Chrome for Testing: the facts about the browser's WebAuthn client that the host's
  * verifier (src/packages/core/src/webauthn) assumes and no unit test can see. A CDP virtual authenticator

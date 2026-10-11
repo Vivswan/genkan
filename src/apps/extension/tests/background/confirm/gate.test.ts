@@ -1,3 +1,4 @@
+// tier: pr
 // The backend-independent preflight (confirm/gate.ts): risk classification,
 // settings gates, grace-window behavior, and the deny paths - driven with a
 // fake backend and a fake confirmation provider.

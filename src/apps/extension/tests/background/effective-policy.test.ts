@@ -1,3 +1,4 @@
+// tier: pr
 // The ONE effective-policy resolution (effective-policy.ts). Pre-cutover it
 // is the deny baseline; post-cutover it is the stored ratcheted effective
 // from policy-sync while ACTIVE - and a BLOCKED posture (awaitingBaseline /

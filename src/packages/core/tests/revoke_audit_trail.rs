@@ -1,3 +1,4 @@
+// tier: pr
 //! Revocation must never rewrite trust state without a trail entry: the
 //! RevokeClient audit record is written by `allowlist::revoke` itself, not by
 //! its callers, so every surface - the CLI handler, the extension's

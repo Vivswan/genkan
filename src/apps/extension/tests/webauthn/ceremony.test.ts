@@ -1,3 +1,4 @@
+// tier: pr
 // The page half of the WebAuthn ceremonies, driven with a fake browser client. What the browser does with
 // the options (prompt, sign) is the isolated-browser suite's (tests/browser/webauthn_test.ts); this pins
 // the shapes the page hands the API and the frames it builds from the API's answers, both external

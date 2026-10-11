@@ -1,3 +1,4 @@
+// tier: pr
 // ContentScriptBackend's transport is a trust boundary in BOTH directions:
 // the outbound message must match ContentMsgSchema (a page-acting message
 // without its guard is refused in the SW, before anything is sent) and the

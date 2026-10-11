@@ -1,3 +1,4 @@
+// tier: pr
 // Entrypoint wiring: the background service worker MUST invoke the storage
 // hardening at startup (and the other one-time setup). This closes the gap the
 // isolated-browser proof cannot observe (Chrome has no getAccessLevel), by

@@ -1,3 +1,4 @@
+// tier: pr
 // The presence route's provider over a fake Connection and a fake window surface: the host is asked before any
 // window opens, the window's answer is judged by the host alone, and every refusal denies with no window.
 

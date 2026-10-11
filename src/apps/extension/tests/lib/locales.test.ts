@@ -1,3 +1,4 @@
+// tier: pr
 // Every user-facing string ships in all three locales. Fails the moment a key
 // is added to one locale file but not the others, or a $n placeholder drifts
 // between languages. The runtime (lib/i18n.ts) falls back to English per key,

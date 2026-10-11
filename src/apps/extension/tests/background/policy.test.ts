@@ -1,3 +1,4 @@
+// tier: pr
 import { describe, expect, test } from "vitest";
 import { decide, type PolicyConfirmation, type RefusalCause } from "@/lib/background/policy";
 

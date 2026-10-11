@@ -1,3 +1,4 @@
+// tier: pr
 import { describe, expect, test } from "bun:test";
 import { isolationProblems } from "../check-gen-isolation.ts";
 

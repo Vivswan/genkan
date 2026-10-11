@@ -1,3 +1,4 @@
+// tier: pr
 // The shared page API: single-source guarantees. The api is rebuilt from its
 // OWN SOURCE TEXT (exactly what the CDP backend ships through
 // Runtime.evaluate) and driven against happy-dom, so these tests prove

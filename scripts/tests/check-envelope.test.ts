@@ -1,3 +1,4 @@
+// tier: pr
 // The envelope asymmetry gate's rules, each shown firing on an input a live run cannot produce. Importing
 // check-envelope.ts runs no gate; its one import-time check, the refinement counter's liveness probe, throws
 // rather than let a dead counter pass.
