@@ -1,5 +1,16 @@
 // Pure allowlist / origin-glob string helpers; no browser API in here.
 
+// The origin of a URL, "" for none, and the raw string when it does not parse: the dispatcher and the
+// confirmation gate key their decisions on it and must never collapse two unparsable URLs into one.
+export function originOf(url: string | undefined): string {
+  if (!url) return "";
+  try {
+    return new URL(url).origin;
+  } catch {
+    return url;
+  }
+}
+
 // Derive the origin glob ("https://host/*") for a URL, or null if unparsable.
 export function originGlobOf(url: string | undefined): string | null {
   try {

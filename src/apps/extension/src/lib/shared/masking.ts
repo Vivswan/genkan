@@ -59,7 +59,7 @@ export function maskKeyName(key: string): string {
   return SENSITIVE_KEY.test(key) ? `••••${key.slice(-2)}` : key;
 }
 
-// Stringify + mask a caught error for the outer egress paths (content.ts's __error reply, port.ts's
+// Stringify + mask a caught error for the outer egress paths (content.ts's `{ ok: false, error }` reply, port.ts's
 // BridgeResp.error): a message can embed page-derived data (a throwing getter, a CDP exception description).
 export function maskErrorMessage(e: unknown): string {
   const message = (e as { message?: unknown } | null | undefined)?.message;

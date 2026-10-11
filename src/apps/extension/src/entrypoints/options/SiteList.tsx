@@ -3,6 +3,7 @@ import { browser } from "wxt/browser";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/hooks/useI18n";
 import { send } from "@/lib/messages";
+import { originGlobOf } from "@/lib/shared/allowlist";
 
 // The per-site allowlist editor: the row list of the options page's hero
 // card (OptionsApp owns the card chrome). Event-driven: refreshes on
@@ -35,11 +36,8 @@ export function SiteList() {
       setNote(t("settings.add_site_format"));
       return;
     }
-    let glob: string;
-    try {
-      const u = new URL(v);
-      glob = `${u.protocol}//${u.host}/*`;
-    } catch {
+    const glob = originGlobOf(v);
+    if (glob === null) {
       setNote(t("settings.add_site_parse_failed"));
       return;
     }

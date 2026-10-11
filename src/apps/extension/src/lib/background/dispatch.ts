@@ -16,6 +16,7 @@ import { isOpName, type OpName } from "@genkan/shared/generated/ops";
 import type { PolicyValues } from "@genkan/shared/generated/policy";
 import { unreachable } from "@genkan/shared/util";
 import { browser } from "wxt/browser";
+import { originOf } from "../shared/allowlist";
 import { inLife } from "../shared/in-life";
 import { isPageOp } from "../shared/page-ops";
 import { ensureAllowed } from "./allowlist-store";
@@ -145,15 +146,6 @@ export async function recheckTab(tab: ResolvedTab): Promise<ResolvedTab> {
   // check rather than a cast.
   if (current.id == null) throw new Error("target tab has no id");
   return current as ResolvedTab;
-}
-
-function originOf(url: string | undefined): string {
-  if (!url) return "";
-  try {
-    return new URL(url).origin;
-  } catch {
-    return url;
-  }
 }
 
 /** Run one request from its frame's arrival to its outcome. Registered for cancel first, then the pipeline
