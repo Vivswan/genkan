@@ -122,7 +122,7 @@ tasks:
       runDepsInParallel: false
 
   ci:
-    description: 'THE GATE CI runs: gate, then the checks that need another runtime or a separately installed binary (typos, cargo-machete, the Python protocol e2e, yamllint, actionlint) or re-lock a scratch workspace (check-refresh-lockfiles); CI layers the OS matrix, linux-install, the adversarial/chaos suites, the browser suites, and the web build on top'
+    description: 'THE GATE CI runs: gate, then the checks that need another runtime or a separately installed binary (typos, cargo-machete, the Python protocol e2e, yamllint, actionlint) or re-lock a scratch workspace (check-refresh-lockfiles); CI adds the OS matrix, linux-install, interop, browser, and web build on every pull request, and the release gate (adversarial/chaos, harness smoke, installers) on the release PR and nightly'
     deps:
       - '~:gate'
       - '~:typos'
@@ -153,7 +153,7 @@ tasks:
       runDepsInParallel: false
 
   release:
-    description: 'Pre-release gate: versions consistent + full ci (release-please cuts the actual release)'
+    description: 'Local pre-release check: versions consistent + full ci (release-please cuts the actual release; the CI release gate is release-gate.yml)'
     deps:
       - '~:check-version'
       - '~:check-extension-id'

@@ -719,8 +719,8 @@ const HARNESSES: Harness[] = [
   },
 ];
 
-/** Mirror tests/protocol/e2e.py ensure_binary(): build the release binary
- * when missing, preferring the homebrew cargo like the e2e suite does. */
+/** Mirror tests/protocol/harness.py ensure_binary(): build the release binary when missing. Unlike the
+ * protocol suites, this prefers the homebrew cargo when it is present. */
 function ensureBinary(): void {
   if (existsSync(BIN)) return;
   console.log("[harness-smoke] release binary missing, building...");

@@ -37,10 +37,11 @@ This is a small, security-sensitive project (it drives a real logged-in browser)
    ```sh
    git pull --rebase origin main
    ```
-4. **Commit; the hook checks.** The lefthook hooks (wired by `moon run setup`) run `moon run static`, the static checks (formatting, lint, types, spelling, the YAML and workflow lints, hygiene), before a commit and after a rebase; a refused commit's message names the fix task. The test suites and builds run in CI on every pull request; `moon run ci` runs everything locally, and `moon run help` lists every task:
+4. **Commit; the hook checks.** The lefthook hooks (wired by `moon run setup`) run `moon run static`, the static checks (formatting, lint, types, spelling, the YAML and workflow lints, hygiene), before a commit and after a rebase; a refused commit's message names the fix task. The test suites and builds run in CI by tier; `moon run ci` is the local gate, and `moon run help` lists every task:
    ```sh
    moon run ci        # rust fmt/clippy/nextest + typos/machete + TS typecheck/biome/test/build + protocol e2e
    ```
+   - CI runs the `pr` tier on every pull request and the release gate on the release PR and every night ([tiers](./tests/README.md#tiers)).
    - The gate is uncached by design (the workspace task default; [docs/development.md](./docs/development.md#moon-the-canonical-command-interface) says why), so it always runs the full suite. `moon ci` (affected-only) is a local convenience, never the gate.
    - Browser tests (`moon run test-browser`) are not part of `moon run ci`. They run **only** against an isolated Chrome for Testing via `CHROME_BIN`, never your daily Chrome (see Safety below and [tests/README.md](./tests/README.md)).
    - CI runs them in checks.yml's `browser` job (inside the all-green gate) against an isolated Chrome. Runtime-behavior changes (reconnect, handshake, service worker) must still be verified there manually.
