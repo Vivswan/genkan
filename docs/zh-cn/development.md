@@ -94,7 +94,7 @@ moon run fix       # auto-fix everything: biome check --write + cargo fmt
 | 契约 | `check-envelope`、`check-gen-isolation` |
 | 工作流 | `check-yaml`、`check-actions` |
 
-CI 在此之上还会运行更多: macOS 和 Windows 的 rust 矩阵、覆盖率、linux-install、对抗与混沌测试套件、互操作测试套件、浏览器测试套件、安装程序、web 构建, 以及各项审计 (见下文的 [CI 布局](#ci-布局))。
+CI 在此之上还会运行更多: 每个拉取请求上运行 macOS 和 Windows 的 rust 矩阵、覆盖率、linux-install、互操作测试套件、浏览器测试套件、web 构建以及各项审计, 发布 PR 和每晚还运行发布门禁 (对抗与混沌测试套件、harness 冒烟测试、安装程序) (见下文的 [CI 布局](#ci-布局))。
 
 根 `package.json` 的 scripts 只是薄薄的别名, 所以两个入口共享同一套实现:
 
@@ -195,7 +195,9 @@ uv 只固定在 `.prototools` 中, python 由 uv 管理: 协议测试套件通�
 
 ## CI 布局
 
-`checks.yml` 把每个关注点定义一次, 由受管 ci.yml 在 all-green 门禁内调用。每个作业都在 GitHub 托管的运行器上运行, 运行器本身已是隔离的, 所以 CI 从不使用容器; 上文的工具链固定一节说明作业如何安装自己的工具, 而 `.github/actions/workspace-deps` 为那些 moon 任务要构建生成契约模块的作业安装 bun 工作区并抓取 crate。
+`checks.yml` 是 `pr` 层级 ([tests/README.md](../../tests/README.md#tiers)): 每个拉取请求和每次推送到 main 时运行的内容, 每个关注点定义一次, 由受管 ci.yml 在 all-green 门禁内调用。
+
+每个作业都在 GitHub 托管的运行器上运行, 运行器本身已是隔离的, 所以 CI 从不使用容器; 上文的工具链固定一节说明作业如何安装自己的工具, 而 `.github/actions/workspace-deps` 为那些 moon 任务要构建生成契约模块的作业安装 bun 工作区并抓取 crate。
 
 | 作业 | 运行内容 | 位置 |
 |-----|------|-------|
@@ -206,11 +208,19 @@ uv 只固定在 `.prototools` 中, python 由 uv 管理: 协议测试套件通�
 | `tooling` | `machete`, 使用 `Containerfile` 固定版本的 cargo-machete | ubuntu 运行器 |
 | `web` | `web:build` | ubuntu 运行器 |
 | `linux-install` | 先下载 `build-release` 的二进制, 再运行 `scripts/linux-registration.ts`: 在隔离的 HOME 和 XDG 目录下运行 `doctor --fix`、重新注册、多浏览器、`uninstall` | ubuntu 运行器, 并带有 cargo 与 moon 以构建场景驱动脚本读取的生成身份模块 |
-| `protocol` | 对下载的二进制运行 `e2e`、`adversarial` 和 `chaos` 测试套件 | ubuntu 运行器 |
+| `protocol` | 对下载的二进制运行 `e2e` 测试套件 | ubuntu 运行器 |
 | `interop` | 官方 MCP SDK 客户端对下载的二进制的测试 | ubuntu 运行器 |
 | `browser` | 可复用的 `browser.yml` (输入 `chrome-version`), `nightly.yml` 也调用它 | ubuntu 运行器, Chrome 来自 `setup-chrome` |
-| `installers` | `installers.yml` 构建 .pkg、.deb 和 .msi, 并在各自的运行器上安装 | 各平台的运行器 |
 | `audits` | `audits.yml`: 对根工作区和模糊测试工作区运行 cargo deny | ubuntu 运行器 |
+
+`release-gate.yml` 是 `release-gate` 层级: 受管 ci.yml 在发布 PR 和手动触发时调用它, 届时 all-green 以它为门禁; `nightly.yml` 按计划调用它, 所以那里的回归第二天早上就会显现并阻止发布, 而不是阻止每次合并。
+
+| 作业 | 运行内容 | 位置 |
+|-----|------|-------|
+| `build-release` | `moon run build-release`, 以自己的产物名上传, 供下方的测试套件使用 | ubuntu 运行器 |
+| `protocol` | 对下载的二进制运行 `adversarial` 和 `chaos` 测试套件 | ubuntu 运行器 |
+| `harness-smoke` | 安装未固定版本的当前 Claude Code 和 Codex 发行版后运行 `tests/harness/run.ts --require-any`; 捕获的帧是该运行的产物 | ubuntu 运行器 |
+| `installers` | `installers.yml` 构建 .pkg、.deb 和 .msi, 并在各自的运行器上安装 | 各平台的运行器 |
 
 `container-build.yml` 是 CI 唯一触及 Docker 的地方: 它只构建 `Containerfile` 而不推送, 并且只在拉取请求或 main 推送改动了 `Containerfile`、`.dockerignore`、`compose.yaml`、`compose.podman.yaml`、`.prototools`、`rust-toolchain.toml` 或该工作流本身时运行。它不在 all-green 的 needs 中, 所以在其他改动上被跳过不花任何代价。
 
@@ -228,7 +238,7 @@ moon run extension:build    # production bundle
 
 ## 测试
 
-协议测试套件 (`tests/protocol/e2e.py`、`adversarial.py`、`chaos.py`) 以子进程方式驱动真实的发布二进制, 走真实的线路协议, 不需要浏览器: `moon run test-e2e` (在门禁中)、`test-adversarial`、`test-chaos`。
+协议测试套件 (`tests/protocol/e2e.py`、`adversarial.py`、`chaos.py`) 以子进程方式驱动真实的发布二进制, 走真实的线路协议, 不需要浏览器: `moon run test-e2e` (在门禁中)、`test-adversarial` 和 `test-chaos` (发布门禁)。
 
 `tests/browser/run_all.ts` 中列出的浏览器测试套件共用一个运行器, CI 的 `browser.yml`、容器和 `moon run test-browser` 都调用它。它先构建扩展, 运行那些测试套件, 然后检查每个套件都留下了自己的 RAN 标记。下表最后一行单独运行:
 
@@ -331,7 +341,7 @@ moon run check-fuzz-smoke  # unit tests for the driver itself (in the ci gate)
 - 本地每个目标运行 30 秒。夜间运行给每个目标 120 秒, 并传入 `--cmin`, 它在缓存保存前最小化每个通过目标的语料库 (cmin 限制每个快照的大小; GitHub 的 LRU 缓存淘汰限制快照数量)。
 - 要对单个目标做真正的持续攻坚, 在 `src/packages/core` 下运行 `cargo +nightly fuzz run <target>`, 不限时长。
 
-夜间作业位于 `.github/workflows/nightly-fuzz.yml`, 它是 fleet 的 fuzzer 模块起始模板在本仓库的实例。浏览器测试和变异测试留在 `nightly.yml` 中, 它在自己的 `nightly-failure` 标签下走同样的生命周期, 但没有失败产物, 所以它的议题指向运行日志。
+夜间作业位于 `.github/workflows/nightly-fuzz.yml`, 它是 fleet 的 fuzzer 模块起始模板在本仓库的实例。浏览器测试、变异测试以及发布门禁的夜间重跑留在 `nightly.yml` 中, 它在自己的 `nightly-failure` 标签下走同样的生命周期, 但没有失败产物, 所以它的议题指向运行日志。
 
 - 红色的一晚: 把 `fuzz/artifacts/` 和 `fuzz/failures/` 作为 `fuzz-failures-<attempt>` 产物上传, 根据报告创建或更新 `fuzz-nightly` 跟踪议题, 并对它派发自动指派。
 - 绿色的一晚: 关闭已打开的议题。
