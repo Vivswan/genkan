@@ -58,7 +58,7 @@ update-release.yml 在一個矩陣上建置 `binaries` 工作 (目前是 `macos-
 - **沒有偵測到任何瀏覽器會使 .pkg 與 .msi 安裝失敗**, 安裝程式日誌中會有 `doctor --fix` 給出的原因。請先安裝一個 Chromium 瀏覽器, 或改用壓縮檔。
 - **這種情況下 .deb 照樣安裝** (`doctor --fix` 結束碼 3, 沒有可註冊的東西), 因為失敗的維護者指令碼會讓 dpkg 停在半設定狀態, 比 .pkg 的拒絕更糟; 因其他原因失敗的註冊仍會讓安裝失敗。
 - **來源:** `packaging/pkg/scripts/postinstall`、`packaging/deb/{postinst,prerm}`、`packaging/msi/genkan.wxs`, 以及 `src/apps/host/Cargo.toml` 中的 `[package.metadata.deb]` 表。`scripts/release-package.ts installer` 執行 pkgbuild、cargo-deb (`--no-build --no-strip`, 所以 .deb 攜帶的是經過證明的位元組) 以及 WiX 3 的 candle 與 light。
-- **每個 pull request 上的證明:** `.github/workflows/installers.yml` 由 `checks.yml` 在 all-green 閘門內呼叫, 從分支建置全部三種安裝程式, 並透過 `scripts/installer-smoke.ts` 在各自的執行器上安裝。Windows 分支是 HKCU 註冊真正執行的地方, 也是迄今唯一執行過的地方。
+- **每次發行前的證明:** `.github/workflows/installers.yml` 由 `release-gate.yml` 在發行 PR 上 (屆時 all-green 以它為閘門) 與每晚呼叫, 從分支建置全部三種安裝程式, 並透過 `scripts/installer-smoke.ts` 在各自的執行器上安裝。Windows 分支是 HKCU 註冊真正執行的地方, 也是迄今唯一執行過的地方。
 
 **目前未簽章。** Gatekeeper 會要求使用者右鍵點選並開啟 .pkg, SmartScreen 則會對 .msi 發出警告。簽章只需切換兩個儲存庫機密以及使用它們的步驟, 而這些目前都還不存在:
 

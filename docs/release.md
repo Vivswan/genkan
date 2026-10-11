@@ -58,7 +58,7 @@ Each leg wraps its binary unchanged into the platform's installer. The post-inst
 - **No detected browser fails the .pkg and .msi install**, with `doctor --fix`'s reason in the installer log. Install a Chromium browser first, or use the archive.
 - **The .deb installs anyway in that case** (exit 3 from `doctor --fix`, nothing to register), because a failing maintainer script leaves dpkg half-configured, worse than the .pkg's refusal; a registration that fails for another reason still fails the install.
 - **Sources:** `packaging/pkg/scripts/postinstall`, `packaging/deb/{postinst,prerm}`, `packaging/msi/genkan.wxs`, and the `[package.metadata.deb]` table in `src/apps/host/Cargo.toml`. `scripts/release-package.ts installer` runs pkgbuild, cargo-deb (`--no-build --no-strip`, so the .deb carries the attested bytes), and WiX 3's candle and light.
-- **Proof on every pull request:** `.github/workflows/installers.yml`, called from `checks.yml` inside the all-green gate, builds all three from the branch and installs each on its runner through `scripts/installer-smoke.ts`. The Windows leg is where the HKCU registration runs for real, and so far the only place it has.
+- **Proof before every release:** `.github/workflows/installers.yml`, called from `release-gate.yml` on the release PR (where all-green blocks on it) and every night, builds all three from the branch and installs each on its runner through `scripts/installer-smoke.ts`. The Windows leg is where the HKCU registration runs for real, and so far the only place it has.
 
 **Unsigned, for now.** Gatekeeper asks the user to right-click and Open the .pkg, and SmartScreen warns on the .msi. Signing is a switch of two repository secrets and the steps that use them, none of which exist yet:
 

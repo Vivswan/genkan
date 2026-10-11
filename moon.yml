@@ -40,7 +40,7 @@
 #
 # `runInCI: false` marks a task `moon ci` must never pick up: tree-mutating ones, user-run ceremonies, and
 # suites that need a browser, a release binary, or a harness CLI. moon resolves none of them when CI=true, so
-# CI invokes those suites' commands directly (checks.yml interop, browser.yml, nightly.yml harness-smoke).
+# CI invokes those suites' commands directly (checks.yml interop, browser.yml, release-gate.yml harness-smoke).
 $schema: 'https://moonrepo.dev/schemas/project.json'
 
 language: 'typescript'
@@ -419,13 +419,13 @@ tasks:
     command: 'uv run --no-project --isolated python -m unittest discover -s tests/protocol -p e2e.py -v'
 
   test-adversarial:
-    description: "Adversarial break-in suite (CI's protocol matrix; drives the real release binary)"
+    description: "Adversarial break-in suite (the release gate's protocol matrix; drives the real release binary)"
     deps:
       - '~:build-release'
     command: 'uv run --no-project --isolated python -m unittest discover -s tests/protocol -p adversarial.py -v'
 
   test-chaos:
-    description: "Fault-injection chaos suite (CI's protocol matrix; drives the real release binary)"
+    description: "Fault-injection chaos suite (the release gate's protocol matrix; drives the real release binary)"
     deps:
       - '~:build-release'
     command: 'uv run --no-project --isolated python -m unittest discover -s tests/protocol -p chaos.py -v'
@@ -702,10 +702,10 @@ tasks:
     options:
       runInCI: false
 
-  # ----- agent-harness interop smoke (nightly workflow; not in the ci gate) --
+  # ----- agent-harness interop smoke (the release gate; not in the pr gate) --
 
   harness-smoke:
-    # Needs the claude and codex CLIs on PATH (nightly.yml's harness-smoke job installs them). Each harness's
+    # Needs the claude and codex CLIs on PATH (release-gate.yml's harness-smoke job installs them). Each harness's
     # opening method is logged as the canary for retiring the legacy-initialize shim; extra flags pass through
     # (`moon run harness-smoke -- --mint-seeds <dir outside the repo>`).
     description: >-

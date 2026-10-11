@@ -58,7 +58,7 @@ update-release.yml 在一个矩阵上构建 `binaries` 作业 (目前为 `macos-
 - **未检测到浏览器会导致 .pkg 和 .msi 安装失败**, 安装程序日志中会记录 `doctor --fix` 给出的原因。请先安装一个 Chromium 系浏览器, 或改用压缩包。
 - **这种情况下 .deb 照样安装** (`doctor --fix` 退出码 3, 没有可注册的东西), 因为失败的维护者脚本会让 dpkg 停在半配置状态, 比 .pkg 的拒绝更糟; 因其他原因失败的注册仍会让安装失败。
 - **源码:** `packaging/pkg/scripts/postinstall`、`packaging/deb/{postinst,prerm}`、`packaging/msi/genkan.wxs`, 以及 `src/apps/host/Cargo.toml` 中的 `[package.metadata.deb]` 表。`scripts/release-package.ts installer` 运行 pkgbuild、cargo-deb (`--no-build --no-strip`, 这样 .deb 携带的是经过证明的字节) 以及 WiX 3 的 candle 和 light。
-- **每个拉取请求上的验证:** `.github/workflows/installers.yml` 由 `checks.yml` 在 all-green 门禁内调用, 从分支构建全部三种安装程序, 并通过 `scripts/installer-smoke.ts` 在各自的运行器上安装。Windows 环节是 HKCU 注册真正运行的地方, 也是迄今唯一运行过的地方。
+- **每次发布前的验证:** `.github/workflows/installers.yml` 由 `release-gate.yml` 在发布 PR 上 (届时 all-green 以它为门禁) 和每晚调用, 从分支构建全部三种安装程序, 并通过 `scripts/installer-smoke.ts` 在各自的运行器上安装。Windows 环节是 HKCU 注册真正运行的地方, 也是迄今唯一运行过的地方。
 
 **目前未签名。** Gatekeeper 会要求用户右键点击并打开 .pkg, SmartScreen 会对 .msi 发出警告。签名只需加入两个仓库密钥以及使用它们的步骤, 这些目前都还不存在:
 

@@ -10,7 +10,7 @@ bun tests/harness/run.ts --mint-seeds ~/scratch/seeds  # also mint captured fram
 ```
 
 - Harnesses whose CLI is not on PATH are skipped with a message. `GENKAN_HARNESS_<NAME>_BIN` (e.g. `GENKAN_HARNESS_CLAUDE_BIN`) pins a specific executable; by default the driver skips terminal-mux proxy shims (cmux) on PATH, which break stdio MCP health checks.
-- Captures land in `build/harness-captures/<harness>.ndjson` (gitignored) plus a `summary.json`; CI's nightly.yml `harness-smoke` job uploads the directory as an artifact.
+- Captures land in `build/harness-captures/<harness>.ndjson` (gitignored) plus a `summary.json`; CI's release-gate.yml `harness-smoke` job uploads the directory as an artifact.
 - `--mint-seeds <dir>` copies deduplicated captured frames into `<dir>` as `harness-<harness>-<method>` files. The path is required and must lie outside the repository; one inside it exits 2 before any harness runs:
 
 ```text
@@ -38,7 +38,7 @@ The suite prints one `CANARY` line per harness naming the OPENING method it sent
 - Claude Code: `claude mcp list` health-checks every approved server with a real MCP handshake - a genuine connection probe, no model call. (It runs unauthenticated today; a claude release that starts requiring login for it would read as a red night rather than a server regression.)
 - Codex: `codex mcp list --json` only verifies registration (reported as "configured"). The real-backend live probe runs a REAL codex agent session (read-only sandbox), so it requires `OPENAI_API_KEY` plus the explicit `GENKAN_HARNESS_CODEX_LIVE=1` opt-in - an ambient key alone never launches an agent. (The fake-LLM probe below needs neither.)
 - After registering, the driver asserts the entry landed in the ISOLATED config file and refuses to probe otherwise (a harness that ignored the isolation env var may have written the real user config - fail closed).
-- `--require-any` (used by the nightly workflow) fails the run unless at least one harness completed a live MCP connection, so an install failure or a config-entry-only run cannot read as green.
+- `--require-any` (used by the release-gate workflow) fails the run unless at least one harness completed a live MCP connection, so an install failure or a config-entry-only run cannot read as green.
 
 ## Live tool-call probes (fake LLM backend)
 

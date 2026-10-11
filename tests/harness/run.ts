@@ -12,13 +12,13 @@
 //                         instead of the legacy `initialize` opener, that opener can be dropped
 //
 // Node builtins only (no scripts/lib.ts import), so it runs without a `bun install`. Dual-use: `moon run
-// harness-smoke` locally, and nightly.yml's harness-smoke job, which uploads build/harness-captures/.
+// harness-smoke` locally, and release-gate.yml's harness-smoke job, which uploads build/harness-captures/.
 //
 // Usage: bun tests/harness/run.ts [--mint-seeds <dir>] [--require-any]
 //   --mint-seeds <dir>  copy deduplicated captured frames into <dir> as mcp_jsonrpc fuzz seeds (tests/harness/README.md, "Run")
-//   --require-any       exit 1 unless at least one harness completed a LIVE MCP connection; the nightly passes this
-//                       so a broken harness install (or a run that only verified config entries) cannot read as a
-//                       green night
+//   --require-any       exit 1 unless at least one harness completed a LIVE MCP connection; the release-gate job
+//                       passes this so a broken harness install (or a run that only verified config entries)
+//                       cannot read as green
 
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";

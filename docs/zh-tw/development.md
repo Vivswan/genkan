@@ -94,7 +94,7 @@ moon run fix       # auto-fix everything: biome check --write + cargo fmt
 | 契約 | `check-envelope`、`check-gen-isolation` |
 | 工作流程 | `check-yaml`、`check-actions` |
 
-CI 在此之上還會執行更多: macOS 與 Windows 的 rust 矩陣、覆蓋率、linux-install、adversarial 與 chaos 測試套件、互通測試套件、瀏覽器測試套件、安裝程式、網站建置, 以及各項稽核 (見下方的 [CI 配置](#ci-配置))。
+CI 在此之上還會執行更多: 每個 pull request 上執行 macOS 與 Windows 的 rust 矩陣、覆蓋率、linux-install、互通測試套件、瀏覽器測試套件、網站建置以及各項稽核, 發行 PR 與每晚還執行發行閘門 (adversarial 與 chaos 測試套件、harness 冒煙測試、安裝程式) (見下方的 [CI 配置](#ci-配置))。
 
 根目錄 `package.json` 的 scripts 是薄薄的別名, 所以兩個進入點共用同一份實作:
 
@@ -195,7 +195,9 @@ uv 只固定於 `.prototools`, 而 python 由 uv 擁有: 協定測試套件透�
 
 ## CI 配置
 
-`checks.yml` 把每個關注點定義一次, 由受管理的 ci.yml 在 all-green 閘門內呼叫。每個工作都在 GitHub 代管的執行器上執行, 執行器本身已是隔離的, 所以 CI 從不使用容器; 上文的工具鏈固定一節說明工作如何佈建自己的工具, 而 `.github/actions/workspace-deps` 為那些 moon 任務要建置產生契約模組的工作安裝 bun workspace 並抓取 crate。
+`checks.yml` 是 `pr` 層級 ([tests/README.md](../../tests/README.md#tiers)): 每個 pull request 與每次推送到 main 時執行的內容, 每個關注點定義一次, 由受管理的 ci.yml 在 all-green 閘門內呼叫。
+
+每個工作都在 GitHub 代管的執行器上執行, 執行器本身已是隔離的, 所以 CI 從不使用容器; 上文的工具鏈固定一節說明工作如何佈建自己的工具, 而 `.github/actions/workspace-deps` 為那些 moon 任務要建置產生契約模組的工作安裝 bun workspace 並抓取 crate。
 
 | 工作 | 執行內容 | 位置 |
 |-----|------|-------|
@@ -206,11 +208,19 @@ uv 只固定於 `.prototools`, 而 python 由 uv 擁有: 協定測試套件透�
 | `tooling` | `machete`, 使用 `Containerfile` 固定版本的 cargo-machete | ubuntu 執行器 |
 | `web` | `web:build` | ubuntu 執行器 |
 | `linux-install` | 先下載 `build-release` 的執行檔, 再執行 `scripts/linux-registration.ts`: 在隔離的 HOME 與 XDG 目錄下執行 `doctor --fix`、重新註冊、多瀏覽器、`uninstall` | ubuntu 執行器, 並帶有 cargo 與 moon 以建置情境驅動指令碼讀取的產生身分模組 |
-| `protocol` | 對下載的執行檔執行 `e2e`、`adversarial` 與 `chaos` 測試套件 | ubuntu 執行器 |
+| `protocol` | 對下載的執行檔執行 `e2e` 測試套件 | ubuntu 執行器 |
 | `interop` | 官方 MCP SDK 用戶端對下載的執行檔 | ubuntu 執行器 |
 | `browser` | 可重用的 `browser.yml` (輸入 `chrome-version`), `nightly.yml` 也會呼叫它 | ubuntu 執行器, Chrome 來自 `setup-chrome` |
-| `installers` | `installers.yml` 建置 .pkg、.deb 與 .msi, 並在各自的執行器上安裝 | 各平台的執行器 |
 | `audits` | `audits.yml`: 對根工作區與模糊測試工作區執行 cargo deny | ubuntu 執行器 |
+
+`release-gate.yml` 是 `release-gate` 層級: 受管理的 ci.yml 在發行 PR 與手動觸發時呼叫它, 屆時 all-green 以它為閘門; `nightly.yml` 依排程呼叫它, 所以那裡的回歸隔天早上就會顯現並擋下發行, 而不是擋下每次合併。
+
+| 工作 | 執行內容 | 位置 |
+|-----|------|-------|
+| `build-release` | `moon run build-release`, 以自己的產物名稱上傳, 供下方的測試套件使用 | ubuntu 執行器 |
+| `protocol` | 對下載的執行檔執行 `adversarial` 與 `chaos` 測試套件 | ubuntu 執行器 |
+| `harness-smoke` | 安裝未固定版本的目前 Claude Code 與 Codex 發行版後執行 `tests/harness/run.ts --require-any`; 擷取的訊框是該次執行的產物 | ubuntu 執行器 |
+| `installers` | `installers.yml` 建置 .pkg、.deb 與 .msi, 並在各自的執行器上安裝 | 各平台的執行器 |
 
 `container-build.yml` 是 CI 唯一觸及 Docker 的地方: 它只建置 `Containerfile` 而不推送, 且只在拉取請求或 main 推送變更了 `Containerfile`、`.dockerignore`、`compose.yaml`、`compose.podman.yaml`、`.prototools`、`rust-toolchain.toml` 或該工作流程本身時執行。它不在 all-green 的 needs 中, 所以在其他變更上被略過不花任何代價。
 
@@ -228,7 +238,7 @@ moon run extension:build    # production bundle
 
 ## 測試
 
-協定測試套件 (`tests/protocol/e2e.py`、`adversarial.py`、`chaos.py`) 以子程序驅動真實的發行執行檔, 走真正的線路協定, 不需要瀏覽器: `moon run test-e2e` (納入閘門)、`test-adversarial`、`test-chaos`。
+協定測試套件 (`tests/protocol/e2e.py`、`adversarial.py`、`chaos.py`) 以子程序驅動真實的發行執行檔, 走真正的線路協定, 不需要瀏覽器: `moon run test-e2e` (納入閘門)、`test-adversarial` 與 `test-chaos` (發行閘門)。
 
 `tests/browser/run_all.ts` 中列出的瀏覽器測試套件共用一個執行器, CI 的 `browser.yml`、容器與 `moon run test-browser` 都呼叫它。它先建置擴充功能, 執行那些測試套件, 然後檢查每個套件都留下了自己的 RAN 標記。下表最後一列單獨執行:
 
@@ -331,7 +341,7 @@ moon run check-fuzz-smoke  # unit tests for the driver itself (in the ci gate)
 - 本機每個目標 30 秒。夜間執行給每個目標 120 秒並傳入 `--cmin`, 在儲存快取之前最小化每個通過目標的語料庫 (cmin 限制每個快照的大小; GitHub 的 LRU 快取淘汰限制快照的數量)。
 - 要對單一目標進行真正的戰役, 在 `src/packages/core` 執行 `cargo +nightly fuzz run <target>` 即可無限制地跑。
 
-夜間工作位於 `.github/workflows/nightly-fuzz.yml`, 是 fleet 的 fuzzer 模組範本在本儲存庫的實例。瀏覽器與變異測試留在 `nightly.yml`, 它以自己的 `nightly-failure` 標籤走同樣的生命週期, 但沒有失敗產物, 所以它的 issue 指向執行日誌。
+夜間工作位於 `.github/workflows/nightly-fuzz.yml`, 是 fleet 的 fuzzer 模組範本在本儲存庫的實例。瀏覽器與變異測試, 以及發行閘門的夜間重跑, 留在 `nightly.yml`, 它以自己的 `nightly-failure` 標籤走同樣的生命週期, 但沒有失敗產物, 所以它的 issue 指向執行日誌。
 
 - 紅燈之夜: 把 `fuzz/artifacts/` 與 `fuzz/failures/` 上傳為 `fuzz-failures-<attempt>` 產物, 依報告建立或更新 `fuzz-nightly` 追蹤 issue, 並對它派發 auto-assign。
 - 綠燈之夜: 關閉開啟中的 issue。
