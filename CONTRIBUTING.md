@@ -37,7 +37,7 @@ This is a small, security-sensitive project (it drives a real logged-in browser)
    ```sh
    git pull --rebase origin main
    ```
-4. **Commit; the hook checks.** The lefthook hooks (wired by `moon run setup`) run `moon run static`, the static checks (formatting, lint, types, spelling, the YAML and workflow lints, hygiene), before a commit and after a rebase; a refused commit's message names the fix task. The test suites and builds run in CI by tier; `moon run ci` runs everything locally, and `moon run help` lists every task:
+4. **Commit; the hook checks.** The lefthook hooks (wired by `moon run setup`) run `moon run static`, the static checks (formatting, lint, types, spelling, the YAML and workflow lints, hygiene), before a commit and after a rebase; a refused commit's message names the fix task. The test suites and builds run in CI by tier; `moon run ci` is the local gate, and `moon run help` lists every task:
    ```sh
    moon run ci        # rust fmt/clippy/nextest + typos/machete + TS typecheck/biome/test/build + protocol e2e
    ```
