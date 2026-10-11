@@ -23,7 +23,12 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import puppeteer, { type Browser, type Target } from "puppeteer-core";
-import { assertIsolatedBrowserOrSkip, extensionDir, finishSuite } from "./browser-safety";
+import {
+  assertIsolatedBrowserOrSkip,
+  extensionDir,
+  finishSuite,
+  serviceWorkerWhere,
+} from "./browser-safety";
 
 const REPO = path.resolve(import.meta.dir, "../..");
 // GENKAN_EXT_DIR overrides; the env var name and default path live in
@@ -54,49 +59,16 @@ interface Sw {
   id: string;
 }
 
-/** Select a service worker by a distinctive manifest permission. Chrome for
- * Testing ships built-in component extensions whose service workers also match
- * a naive `type === "service_worker"` filter, so pick by permission. */
-async function findSw(browser: Browser, has: (perms: string[]) => boolean): Promise<Sw> {
-  for (let i = 0; i < 40; i++) {
-    for (const t of browser.targets().filter((x) => x.type() === "service_worker")) {
-      const w = await t.worker().catch(() => null);
-      if (!w) continue;
-      const perms = (await w
-        .evaluate(() => chrome.runtime.getManifest().permissions ?? [])
-        .catch(() => [])) as string[];
-      if (has(perms)) {
-        const id = t.url().match(/chrome-extension:\/\/([a-p]+)\//)?.[1] ?? "";
-        return { worker: w, id };
-      }
-    }
-    await Bun.sleep(400);
-  }
-  throw new Error("service worker not found");
+/** A service worker picked by a manifest permission. */
+async function findSw(browser: Browser, has: (perms: readonly string[]) => boolean): Promise<Sw> {
+  const { worker, id } = await serviceWorkerWhere(browser, (m) => has(m.permissions ?? []));
+  return { worker, id };
 }
 
-/** Select a service worker by its extension's manifest name (unique per
- * fixture), so the helper cannot be confused with any other extension. */
+/** A service worker picked by its extension's manifest name, which is unique per fixture. */
 async function findSwByName(browser: Browser, name: string): Promise<Sw> {
-  return findSwBy(browser, async (w) => {
-    const n = (await w.evaluate(() => chrome.runtime.getManifest().name).catch(() => "")) as string;
-    return n === name;
-  });
-}
-
-async function findSwBy(browser: Browser, match: (w: Worker) => Promise<boolean>): Promise<Sw> {
-  for (let i = 0; i < 40; i++) {
-    for (const t of browser.targets().filter((x) => x.type() === "service_worker")) {
-      const w = await t.worker().catch(() => null);
-      if (!w) continue;
-      if (await match(w).catch(() => false)) {
-        const id = t.url().match(/chrome-extension:\/\/([a-p]+)\//)?.[1] ?? "";
-        return { worker: w, id };
-      }
-    }
-    await Bun.sleep(400);
-  }
-  throw new Error("service worker not found");
+  const { worker, id } = await serviceWorkerWhere(browser, (m) => m.name === name);
+  return { worker, id };
 }
 
 let lastUserDataDir = "";
