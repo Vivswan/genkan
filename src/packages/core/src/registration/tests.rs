@@ -1074,9 +1074,8 @@ fn no_targets_reason_reads_as_a_page_sentence() {
 /// configure the package; every other refusal, and clap's usage exit 2, must still fail the install.
 #[test]
 fn nothing_detected_exits_three_and_every_other_refusal_exits_one() {
-    assert_eq!(NOTHING_TO_REGISTER, 3);
     let cases: Vec<(FixError, i32)> = vec![
-        (FixError::NoTargets("none".into()), NOTHING_TO_REGISTER),
+        (FixError::NoTargets("none".into()), 3),
         (FixError::Environment("no HOME".into()), 1),
         (FixError::Privilege("not root".into()), 1),
         (FixError::HostExe(std::io::Error::other("gone")), 1),
