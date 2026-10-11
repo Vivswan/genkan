@@ -74,7 +74,7 @@ moon run test      # rust tests (nextest + doctests) + protocol e2e
 moon run ci        # THE GATE: the cross-platform CI steps (see below for what CI adds)
 moon run static    # the pre-commit hook's checks: formatting, lint, types, spelling, yaml + workflow lint, hygiene
 moon run gate      # every check the repository's own toolchain provides: static's cargo and bun members + tests + builds
-moon run release   # pre-release gate: version checks + full ci
+moon run release   # local pre-release check: version checks + full ci
 moon run install   # build the release binary, then register it (doctor --fix)
 moon run lint      # lint everything: clippy -D warnings + biome lint
 moon run fmt       # format everything: cargo fmt + biome format

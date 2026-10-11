@@ -35,7 +35,7 @@ The suite prints one `CANARY` line per harness naming the OPENING method it sent
 
 ## Probes without model calls
 
-- Claude Code: `claude mcp list` health-checks every approved server with a real MCP handshake - a genuine connection probe, no model call. (It runs unauthenticated today; a claude release that starts requiring login for it would read as a red night rather than a server regression.)
+- Claude Code: `claude mcp list` health-checks every approved server with a real MCP handshake - a genuine connection probe, no model call. (It runs unauthenticated today; a claude release that starts requiring login for it would read as a red release gate, on the release PR or the nightly, rather than a server regression.)
 - Codex: `codex mcp list --json` only verifies registration (reported as "configured"). The real-backend live probe runs a REAL codex agent session (read-only sandbox), so it requires `OPENAI_API_KEY` plus the explicit `GENKAN_HARNESS_CODEX_LIVE=1` opt-in - an ambient key alone never launches an agent. (The fake-LLM probe below needs neither.)
 - After registering, the driver asserts the entry landed in the ISOLATED config file and refuses to probe otherwise (a harness that ignored the isolation env var may have written the real user config - fail closed).
 - `--require-any` (used by the release-gate workflow) fails the run unless at least one harness completed a live MCP connection, so an install failure or a config-entry-only run cannot read as green.
