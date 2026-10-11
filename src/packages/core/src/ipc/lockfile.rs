@@ -39,7 +39,8 @@ const LOCK_MAX_BYTES: usize = 64 * 1024;
 pub const LOCK_FILENAME: &str = "run.lock";
 
 impl LockFile {
-    /// Path of the lock file in the per-user runtime directory, which is created on the way.
+    /// Path of the lock file in the per-user runtime directory, which is created on the way: the writers'
+    /// path. Readers resolve without creating, so `doctor` stays a read that changes nothing.
     pub fn path() -> io::Result<PathBuf> {
         Ok(Self::path_in(&RuntimeDir::ensure()?))
     }
@@ -56,7 +57,8 @@ impl LockFile {
     }
 
     pub fn read() -> io::Result<Option<Self>> {
-        let Some(bytes) = read_capped(&Self::path()?, LOCK_MAX_BYTES)? else {
+        let path = Self::path_in(&RuntimeDir::resolve()?);
+        let Some(bytes) = read_capped(&path, LOCK_MAX_BYTES)? else {
             return Ok(None);
         };
         let lf: LockFile = serde_json::from_slice(&bytes).map_err(|e| {

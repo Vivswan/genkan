@@ -319,9 +319,10 @@ pub(crate) fn gather_manifests() -> Result<Vec<ManifestStatus>, String> {
         .collect())
 }
 
-/// Gather the report by reading (never mutating) local state.
+/// Gather the report by reading (never mutating) local state: the runtime dir is resolved, not created, so a
+/// machine with none reports it instead of gaining a directory from a diagnostic.
 pub fn gather() -> Report {
-    let lock = RuntimeDir::ensure()
+    let lock = RuntimeDir::resolve()
         .map(|dir| LockReport {
             path: LockFile::path_in(&dir),
             state: match LockFile::read() {
@@ -1003,6 +1004,26 @@ mod tests {
             !absent.exists(),
             "doctor --paths created {}",
             absent.display()
+        );
+    }
+
+    /// docs/cli.md and docs/troubleshooting.md promise that `doctor` changes nothing. The lock and record
+    /// readers resolve the runtime dir instead of creating it, so an absent dir stays absent and the report
+    /// reads it as a stopped server rather than minting a directory on the way.
+    #[test]
+    fn gather_names_an_absent_runtime_dir_without_creating_it() {
+        let guard = crate::test_support::scratch_runtime_dir();
+        let absent = guard.point_at_absent("never-made");
+        let report = gather();
+        assert!(!absent.exists(), "doctor created {}", absent.display());
+        let lock = report
+            .lock
+            .as_ref()
+            .expect("an absent runtime dir still resolves to a path");
+        assert!(
+            matches!(lock.state, LockState::Absent),
+            "an absent dir reads as no lock file, got {:?}",
+            lock.state
         );
     }
 
