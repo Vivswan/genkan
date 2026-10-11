@@ -39,24 +39,27 @@ function outcomeOf(p: Promise<unknown>): Promise<"allowed" | "denied"> {
 }
 
 describe("canonicalOriginGlob", () => {
-  test("reduces any http(s) URL to protocol://host/*", () => {
-    expect(canonicalOriginGlob("https://example.com/path?q=1")).toBe("https://example.com/*");
-    expect(canonicalOriginGlob("http://a.b.example.com:8080/")).toBe(
+  const cases: readonly [string, unknown, string | null][] = [
+    [
+      "a path and query reduce to protocol://host/*",
+      "https://example.com/path?q=1",
+      "https://example.com/*",
+    ],
+    [
+      "a port and subdomains are kept in the glob",
+      "http://a.b.example.com:8080/",
       "http://a.b.example.com:8080/*",
-    );
-    expect(canonicalOriginGlob("  https://x.test  ")).toBe("https://x.test/*");
-  });
-
-  test("drops embedded credentials", () => {
-    expect(canonicalOriginGlob("https://user:pass@example.com/")).toBe("https://example.com/*");
-  });
-
-  test("refuses non-http(s) and unparsable input", () => {
-    expect(canonicalOriginGlob("file:///etc/passwd")).toBeNull();
-    expect(canonicalOriginGlob("javascript:alert(1)")).toBeNull();
-    expect(canonicalOriginGlob("not a url")).toBeNull();
-    expect(canonicalOriginGlob("")).toBeNull();
-    expect(canonicalOriginGlob(123)).toBeNull();
+    ],
+    ["surrounding whitespace is trimmed", "  https://x.test  ", "https://x.test/*"],
+    ["embedded credentials are dropped", "https://user:pass@example.com/", "https://example.com/*"],
+    ["a file: URL is refused", "file:///etc/passwd", null],
+    ["a javascript: URL is refused", "javascript:alert(1)", null],
+    ["unparsable text is refused", "not a url", null],
+    ["the empty string is refused", "", null],
+    ["a non-string is refused", 123, null],
+  ];
+  test.each(cases)("%s", (_, input, expected) => {
+    expect(canonicalOriginGlob(input)).toBe(expected);
   });
 });
 

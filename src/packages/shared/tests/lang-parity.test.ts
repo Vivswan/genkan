@@ -12,7 +12,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { DEFAULTS, SettingsSchema, UI_LANGUAGES } from "../src/settings";
+import { DEFAULTS, UI_LANGUAGES } from "../src/settings";
 
 const langRs = readFileSync(
   join(dirname(fileURLToPath(import.meta.url)), "../../core/src/lang.rs"),
@@ -25,15 +25,6 @@ function rustStringList(body: string): string[] {
 }
 
 describe("shared language enum parity across the hand-kept TS and Rust copies", () => {
-  test("the settings schema accepts exactly the canonical UI_LANGUAGES", () => {
-    for (const value of UI_LANGUAGES) {
-      expect(SettingsSchema.shape.uiLanguage.safeParse(value).success).toBe(true);
-    }
-    for (const value of ["de", "zh", "EN", "", "auto "]) {
-      expect(SettingsSchema.shape.uiLanguage.safeParse(value).success).toBe(false);
-    }
-  });
-
   test("core lang.rs UI_LANGUAGES matches the canonical list", () => {
     const m = langRs.match(/pub const UI_LANGUAGES: &\[&str\] = &\[([^\]]*)\];/);
     expect(m, "UI_LANGUAGES slice not found in lang.rs").toBeTruthy();

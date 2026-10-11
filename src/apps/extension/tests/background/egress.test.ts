@@ -99,13 +99,12 @@ describe("storage_get is ALWAYS masked", () => {
     await expect(mask("storage_get", SECRETS.jwt)).rejects.toThrow("refusing to egress");
   });
 
-  test("the wire schema stays in lockstep with the page API's result type", () => {
-    // Compile-time two-way parity; if either side drifts this stops building.
-    const single: StorageReadResult = { key: "k", found: true, value: "v" };
-    const wire: StorageReadResultWire = single;
-    const back: StorageReadResult = wire;
-    expect(back).toEqual(single);
-  });
+  // Type-level pin, enforced by tsc (moon typecheck), never by vitest: the
+  // wire schema's result type and the page API's result type assign both
+  // ways, so a drift on either side stops the build.
+  const toWire = (single: StorageReadResult): StorageReadResultWire => single;
+  const toResult = (wire: StorageReadResultWire): StorageReadResult => wire;
+  toResult(toWire({ key: "k", found: true, value: "v" }));
 });
 
 describe("page_eval is masked by default, raw only on explicit opt-out", () => {

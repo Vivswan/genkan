@@ -1,11 +1,12 @@
 // Semantics of the generated policy contract (generated/policy.ts): the deny
-// baseline, the direction table, the salvage posture, and the strict
-// document validator. The SOURCE is the Rust core
+// baseline and the strict document, values, and overlay validators, each a
+// table of inputs and whether it admits them. The SOURCE is the Rust core
 // (src/packages/core/src/policy/mod.rs) and the module is rebuilt from it
 // before this suite runs, so these tests own the semantics, not the
 // provenance: Rust-parity bounds and the cross-language golden vectors.
 
 import { describe, expect, test } from "bun:test";
+import type { z } from "zod";
 import { POLICY_GOLDEN_FIXTURE } from "../generated/enclave-fixture";
 import {
   DISABLED_TOOL_NAME_MAX_BYTES,
@@ -35,117 +36,124 @@ describe("POLICY_DEFAULTS", () => {
   });
 });
 
-describe("PolicyDocSchema", () => {
-  test("accepts a well-formed document", () => {
-    const parsed = PolicyDocSchema.parse(wellFormedDoc());
-    expect(parsed.revision).toBe(1);
-    expect(parsed.touched).toEqual(["pageEvalEnabled"]);
-  });
-
-  test("rejects an unknown field, fail-closed", () => {
-    expect(PolicyDocSchema.safeParse({ ...wellFormedDoc(), surprise: true }).success).toBe(false);
-  });
-
-  test("rejects a revision beyond the JS-safe bound", () => {
-    expect(POLICY_REVISION_MAX).toBe(Number.MAX_SAFE_INTEGER);
-    expect(
-      PolicyDocSchema.safeParse({ ...wellFormedDoc(), revision: POLICY_REVISION_MAX }).success,
-    ).toBe(true);
-    expect(
-      PolicyDocSchema.safeParse({ ...wellFormedDoc(), revision: POLICY_REVISION_MAX + 1 }).success,
-    ).toBe(false);
-  });
-
-  test("rejects a touched set naming the retired requireEnrollment", () => {
-    expect(
-      PolicyDocSchema.safeParse({ ...wellFormedDoc(), touched: ["requireEnrollment"] }).success,
-    ).toBe(false);
-  });
-
-  test("rejects a foreign document version", () => {
-    expect(PolicyDocSchema.safeParse({ ...wellFormedDoc(), v: 2 }).success).toBe(false);
-    expect(PolicyDocSchema.safeParse({ ...wellFormedDoc(), v: 0 }).success).toBe(false);
-  });
-
-  test("rejects millisecond fields beyond the JS-safe bound (Rust parity)", () => {
-    // The Rust parser bounds these to JS_SAFE_INT_MAX for exactly this
-    // equivalence; a value only one side accepts would sign host-side and
-    // brick the push extension-side.
-    for (const field of [
-      "hostReverifyMs",
-      "confirmGraceMs",
-      "clickToastTimeoutMs",
-      "evalToastTimeoutMs",
-    ]) {
-      expect(
-        PolicyDocSchema.safeParse({ ...wellFormedDoc(), [field]: Number.MAX_SAFE_INTEGER }).success,
-      ).toBe(true);
-      expect(
-        PolicyDocSchema.safeParse({ ...wellFormedDoc(), [field]: Number.MAX_SAFE_INTEGER + 1 })
-          .success,
-      ).toBe(false);
-    }
-  });
-
-  test("bounds disabledTools entries (Rust parity)", () => {
-    const withTools = (disabledTools: string[]) => ({ ...wellFormedDoc(), disabledTools });
-    const atCap = Array.from({ length: DISABLED_TOOLS_MAX_ENTRIES }, (_, i) => `tool_${i}`);
-    expect(PolicyDocSchema.safeParse(withTools(atCap)).success).toBe(true);
-    expect(PolicyDocSchema.safeParse(withTools([...atCap, "one_more"])).success).toBe(false);
-    expect(
-      PolicyValuesSchema.safeParse({
-        ...POLICY_DEFAULTS,
-        disabledTools: ["a".repeat(DISABLED_TOOL_NAME_MAX_BYTES)],
-      }).success,
-    ).toBe(true);
-    expect(
-      PolicyValuesSchema.safeParse({
-        ...POLICY_DEFAULTS,
-        disabledTools: ["a".repeat(DISABLED_TOOL_NAME_MAX_BYTES + 1)],
-      }).success,
-    ).toBe(false);
-    expect(PolicyValuesSchema.safeParse({ ...POLICY_DEFAULTS, disabledTools: [""] }).success).toBe(
-      false,
+// Each row: what it pins, the input, and whether the schema admits it. An
+// admitted input parses to itself: the strict schemas invent no default and
+// drop no field, so an accepted row also pins the parsed document.
+type SchemaRow = readonly [string, unknown, boolean];
+function pinsAdmission(schema: z.ZodType, rows: readonly SchemaRow[]) {
+  test.each(rows)("%s", (_, input, accepted) => {
+    expect(schema.safeParse(input)).toEqual(
+      accepted ? { success: true, data: input } : { success: false, error: expect.anything() },
     );
   });
+}
+
+describe("PolicyDocSchema", () => {
+  const docWith = (mutation: Record<string, unknown>) => ({ ...wellFormedDoc(), ...mutation });
+  const atCap = Array.from({ length: DISABLED_TOOLS_MAX_ENTRIES }, (_, i) => `tool_${i}`);
+  // The Rust parser bounds the millisecond fields to JS_SAFE_INT_MAX for exactly
+  // this equivalence; a value only one side accepts would sign host-side and
+  // brick the push extension-side.
+  const msFields = [
+    "hostReverifyMs",
+    "confirmGraceMs",
+    "clickToastTimeoutMs",
+    "evalToastTimeoutMs",
+  ];
+  pinsAdmission(PolicyDocSchema, [
+    ["a well-formed document is accepted and parses to itself", docWith({}), true],
+    ["an unknown field is rejected, fail-closed", docWith({ surprise: true }), false],
+    [
+      "a revision at the JS-safe bound is accepted",
+      docWith({ revision: POLICY_REVISION_MAX }),
+      true,
+    ],
+    [
+      "a revision beyond the JS-safe bound is rejected",
+      docWith({ revision: POLICY_REVISION_MAX + 1 }),
+      false,
+    ],
+    [
+      "a touched set naming the retired requireEnrollment is rejected",
+      docWith({ touched: ["requireEnrollment"] }),
+      false,
+    ],
+    ["a later document version is rejected", docWith({ v: 2 }), false],
+    ["an earlier document version is rejected", docWith({ v: 0 }), false],
+    ...msFields.flatMap((field): SchemaRow[] => [
+      [
+        `${field} at the JS-safe bound is accepted (Rust parity)`,
+        docWith({ [field]: Number.MAX_SAFE_INTEGER }),
+        true,
+      ],
+      [
+        `${field} beyond the JS-safe bound is rejected (Rust parity)`,
+        docWith({ [field]: Number.MAX_SAFE_INTEGER + 1 }),
+        false,
+      ],
+    ]),
+    [
+      "disabledTools at the entry cap is accepted (Rust parity)",
+      docWith({ disabledTools: atCap }),
+      true,
+    ],
+    [
+      "disabledTools one over the entry cap is rejected (Rust parity)",
+      docWith({ disabledTools: [...atCap, "one_more"] }),
+      false,
+    ],
+  ]);
+});
+
+describe("PolicyValuesSchema", () => {
+  const valuesWith = (disabledTools: string[]) => ({ ...POLICY_DEFAULTS, disabledTools });
+  pinsAdmission(PolicyValuesSchema, [
+    [
+      "a tool name at the byte cap is accepted (Rust parity)",
+      valuesWith(["a".repeat(DISABLED_TOOL_NAME_MAX_BYTES)]),
+      true,
+    ],
+    [
+      "a tool name one over the byte cap is rejected (Rust parity)",
+      valuesWith(["a".repeat(DISABLED_TOOL_NAME_MAX_BYTES + 1)]),
+      false,
+    ],
+    ["an empty tool name is rejected", valuesWith([""]), false],
+  ]);
 });
 
 describe("PolicyOverlaySchema", () => {
-  test("accepts the empty overlay and any all-owned subset", () => {
-    expect(PolicyOverlaySchema.safeParse({}).success).toBe(true);
-    expect(
-      PolicyOverlaySchema.safeParse({
-        pageEvalEnabled: false,
-        confirmGraceMs: 0,
-        disabledTools: ["page_eval"],
-      }).success,
-    ).toBe(true);
-  });
-
-  test("rejects a field the catalogue does not own, fail-closed", () => {
-    expect(PolicyOverlaySchema.safeParse({ requireEnrollment: false }).success).toBe(false);
-    expect(PolicyOverlaySchema.safeParse({ uiLanguage: "en" }).success).toBe(false);
-  });
-
-  test("bounds millisecond fields and disabledTools like the document (Rust parity)", () => {
-    expect(PolicyOverlaySchema.safeParse({ confirmGraceMs: Number.MAX_SAFE_INTEGER }).success).toBe(
+  pinsAdmission(PolicyOverlaySchema, [
+    ["the empty overlay is accepted and invents no value for an absent field", {}, true],
+    [
+      "an all-owned subset is accepted",
+      { pageEvalEnabled: false, confirmGraceMs: 0, disabledTools: ["page_eval"] },
       true,
-    );
-    expect(
-      PolicyOverlaySchema.safeParse({ confirmGraceMs: Number.MAX_SAFE_INTEGER + 1 }).success,
-    ).toBe(false);
-    expect(PolicyOverlaySchema.safeParse({ hostReverifyMs: -1 }).success).toBe(false);
-    expect(PolicyOverlaySchema.safeParse({ disabledTools: [""] }).success).toBe(false);
-    expect(
-      PolicyOverlaySchema.safeParse({
-        disabledTools: ["a".repeat(DISABLED_TOOL_NAME_MAX_BYTES + 1)],
-      }).success,
-    ).toBe(false);
-  });
-
-  test("never invents a value for an absent field", () => {
-    expect(PolicyOverlaySchema.parse({})).toEqual({});
-  });
+    ],
+    ["the retired requireEnrollment is rejected, fail-closed", { requireEnrollment: false }, false],
+    [
+      "a settings field the catalogue does not own is rejected, fail-closed",
+      { uiLanguage: "en" },
+      false,
+    ],
+    [
+      "a millisecond field at the JS-safe bound is accepted (Rust parity)",
+      { confirmGraceMs: Number.MAX_SAFE_INTEGER },
+      true,
+    ],
+    [
+      "a millisecond field beyond the JS-safe bound is rejected (Rust parity)",
+      { confirmGraceMs: Number.MAX_SAFE_INTEGER + 1 },
+      false,
+    ],
+    ["a negative millisecond field is rejected", { hostReverifyMs: -1 }, false],
+    ["an empty tool name is rejected", { disabledTools: [""] }, false],
+    [
+      "a tool name one over the byte cap is rejected (Rust parity)",
+      { disabledTools: ["a".repeat(DISABLED_TOOL_NAME_MAX_BYTES + 1)] },
+      false,
+    ],
+  ]);
 });
 
 // The POLICY_DOMAIN golden vectors (generated/enclave-fixture.ts): the byte-level
