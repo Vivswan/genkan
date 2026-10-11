@@ -97,9 +97,11 @@ export function writeHostWrapper(
     writeFileSync(wrapper, `@echo off\r\n${sets}\r\n"${bin}" ${args.join(" ")}\r\n`);
     return wrapper;
   }
+  // Single-quoted POSIX words: a path with a space, a quote, or a `$` reaches the host unchanged.
+  const q = (value: string): string => `'${value.replace(/'/g, "'\\''")}'`;
   const wrapper = join(dir, "run-host.sh");
-  const exports = names.map((name) => `export ${name}="${env[name]}"`).join("\n");
-  writeFileSync(wrapper, `#!/bin/sh\n${exports}\nexec "${bin}" ${args.join(" ")}\n`, {
+  const exports = names.map((name) => `export ${name}=${q(env[name] ?? "")}`).join("\n");
+  writeFileSync(wrapper, `#!/bin/sh\n${exports}\nexec ${q(bin)} ${args.map(q).join(" ")}\n`, {
     mode: 0o755,
   });
   return wrapper;
