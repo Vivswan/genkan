@@ -454,7 +454,7 @@ Any `chrome.debugger.attach` shows a "Started debugging this browser" banner on 
 The manifest's `path` must be a bare executable. Mitigation: a wrapper script bakes in `--native-host`, with `--label <browser>` (`run-host-<browser>.sh`) when one browser alone launches that manifest and none (`run-host.sh`) when several read it, per `registration/mod.rs`; the label keys the broker's connection registry.
 
 ### 7.4 chrome.permissions.request requires a user gesture
-Host permissions can only be requested from a user-gesture context. Mitigation: the allowlist authorization flow goes through the popup; Allow requests the permission and records the entry together.
+Host permissions can only be requested from a user-gesture context. Mitigation: the allowlist authorization flow runs inside a click, in the popup (Allow) or on the options page (Add); each requests the permission first and records the entry only once it is granted.
 
 ### 7.5 Static content_scripts conflict with optional permissions
 With empty initial host permissions, manifest-declared content scripts never inject. Mitigation: no manifest `content_scripts`; everything injects at runtime via `chrome.scripting.executeScript`, following the granted optional permissions.

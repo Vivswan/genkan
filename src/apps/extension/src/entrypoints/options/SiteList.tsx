@@ -3,7 +3,7 @@ import { browser } from "wxt/browser";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/hooks/useI18n";
 import { send } from "@/lib/messages";
-import { originGlobOf } from "@/lib/shared/allowlist";
+import { globToPermissionPattern, originGlobOf } from "@/lib/shared/allowlist";
 
 // The per-site allowlist editor: the row list of the options page's hero
 // card (OptionsApp owns the card chrome). Event-driven: refreshes on
@@ -41,11 +41,29 @@ export function SiteList() {
       setNote(t("settings.add_site_parse_failed"));
       return;
     }
+    // The host permission is requested here, inside the click or Enter (a user gesture, which MV3 requires
+    // for permissions.request and which the service worker never has). A grant this click obtained is
+    // handed back when the worker fails to persist its entry; one held before the click is left alone.
+    const pattern = globToPermissionPattern(glob);
+    if (pattern === null) {
+      setNote(t("settings.add_site_parse_failed"));
+      return;
+    }
+    const origins = { origins: [pattern] };
+    const heldBefore = await browser.permissions.contains(origins).catch(() => false);
+    const granted = await browser.permissions.request(origins).catch(() => false);
+    if (!granted) {
+      setNote(t("settings.add_site_permission_not_granted"));
+      return;
+    }
     const resp = await send({ type: "add_allow", glob });
     if (resp.ok) {
       setValue("");
       setNote("");
       void refresh();
+    } else {
+      if (!heldBefore) await browser.permissions.remove(origins).catch(() => {});
+      setNote(resp.error);
     }
   };
 

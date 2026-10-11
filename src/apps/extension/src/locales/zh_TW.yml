@@ -144,6 +144,7 @@ settings:
   add_site_placeholder: "https://example.com/*"
   add_site_format: "格式應為 https://host/*"
   add_site_parse_failed: "無法解析該 URL"
+  add_site_permission_not_granted: "瀏覽器未授予該站點的權限; 未新增任何內容。"
 
 presence:
   surface_platform_authenticator: "硬體驗證: 由本裝置的驗證器 (Touch ID、Windows Hello) 為每次核准簽章。"

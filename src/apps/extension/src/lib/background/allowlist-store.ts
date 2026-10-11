@@ -187,9 +187,9 @@ export async function resolvePendingAllow(
   return { ok: true };
 }
 
-// Manual add from the options page persists the glob only: this worker has no user gesture, which MV3
-// requires for browser.permissions.request, and ensureAllowed never asks for one either (a listed origin
-// returns at matchesAny). The popup's Allow is the one place a per-origin host permission is requested.
+// Manual add from the options page persists the glob; the page requested the host permission inside its
+// click (a user gesture, which MV3 requires for browser.permissions.request and this worker never has)
+// before sending, and ensureAllowed asks for none later (a listed origin returns at matchesAny).
 export async function addAllow(input: string): Promise<RuntimeResponse<"add_allow">> {
   const glob = canonicalOriginGlob(input);
   if (!glob) return { ok: false, error: `not a valid http(s) origin: ${input}` };
