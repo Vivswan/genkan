@@ -15,7 +15,7 @@
 | `genkan doctor --paths` | 唯讀診斷 | 印出此環境解析出的執行階段目錄與鎖定檔路徑, 兩者都不建立。 |
 | `genkan doctor --fix` | 修復 / 安裝 | 為你的帳戶將此執行檔註冊 (或重新註冊) 為原生訊息主機。doctor 唯一會修改狀態的形式。 |
 | `genkan doctor --fix --system` | 修復 / 安裝 (root) | 同樣的動作, 但是機器層級: 寫入每個帳戶的瀏覽器都會讀取的、由 root 擁有的目錄。`.deb` 安裝後執行的就是它。 |
-| `genkan uninstall [--system]` | 移除 | 只移除本專案在該範圍寫入的註冊, 別無其他。 |
+| `genkan uninstall [--system \| --manifest-dir <dir>...]` | 移除 | 只移除本專案在該範圍寫入的註冊, 別無其他。 |
 | `genkan pair [--reset] [--file-store]` | 登記 | 在終端機輸入確認之後, 產生擴充功能所固定的主機金鑰; 金鑰存放在作業系統的憑證存放區, 或在使用 `--file-store` 時存放在一個 0600 檔案中。 |
 | `genkan revoke <browser>` | 登記 | 忘記該瀏覽器已登記的認證器; 不需要證明, 該瀏覽器可從其選項頁面重新登記。 |
 | `genkan revoke --all` | 登記 | 從頭來過: 刪除主機金鑰與已簽署的策略基準, 忘記每一個瀏覽器與每一個受信任用戶端。不帶引數的 `revoke` 會被拒絕並顯示用法。 |
@@ -33,6 +33,7 @@
 | `genkan audit [--limit <n>]` | 唯讀稽核 | 印出磁碟上的稽核日誌, 最舊的在前 (預設: 最後 200 筆記錄)。 |
 | `genkan lang [show \| set <value>]` | 顯示語言 | 讀取或設定選項頁面顯示的語言; 單獨的 `lang` 等同於 `show`。 |
 | `genkan --help` | 說明 | 用法資訊。 |
+| `genkan --version` | 版本 | 執行檔的版本號。 |
 
 選項頁面提供同樣的動作。依設計只在終端機上: `uninstall` (見下文), 以及 `--system` 與 `--manifest-dir` 兩種修復形式。選項頁面的稽核檢視可用「顯示更早」擴展到幀的上限; 完整日誌用 `audit --limit <n>`。網站允許清單、全部允許與分頁分組留在選項頁面上。它們是瀏覽器本機的擴充功能儲存空間 (見[隱私權政策](./privacy-policy.md)), 沒有任何子命令讀寫它們。
 
@@ -44,9 +45,9 @@
 
 - **版本 / 平台**: 執行檔版本 (以 Cargo 為準) 與執行中的平台。
 - **鎖定檔**: 執行階段目錄中是否存在橋接鎖定檔, 以及其中記錄的端點與 pid。
-- **伺服器可達性**: 對我們自己的橋接 socket 做一次被動的連上即斷開的探測 (不送出任何位元組), 回報 `reachable` / `not reachable`。
+- **伺服器可達性**: 對我們自己的橋接 socket 做一次被動的連上即斷開的探測 (不送出任何位元組), 回報 `reachable` / `not reachable`, 沒有執行期目錄、沒有鎖定檔或鎖定檔無法讀取時回報 `not probed`。
 - **緊急開關**: 已啟用、已清除或無法讀取。開關啟用期間或其狀態無法讀取時, `doctor` 以非零結束碼結束。
-- **原生訊息主機註冊**: 對每個已知瀏覽器 (chrome、chromium、brave、edge、vivaldi、opera), 回報它在這台機器上看起來是否存在, 以及它對 `com.vivswan.genkan.host` 在 `user` 與 `system` 兩個範圍各自的註冊狀態: `ok`、`missing`、`stale` (是我們的, 但其啟動路徑已失效) 或不是我們的。
+- **原生訊息主機註冊**: 對每個已知瀏覽器 (chrome、chromium、brave、edge、vivaldi、opera), 回報它在這台機器上看起來是否存在, 以及它對 `com.vivswan.genkan.host` 在 `user` 與 `system` 兩個範圍各自的註冊狀態: `ok`、`missing`、`stale` (是我們的, 但其啟動路徑或資訊清單已失效)、`unreadable` 或不是我們的。
 - **判定遵循瀏覽器的查找順序**: 有每使用者條目時取它, 沒有時才取系統條目。診斷結果來自 `--fix` 修復時所用的同一個解析器, 所以 doctor 回報的正是 `--fix` 會產生的結果。
 
 選項頁面的「主機註冊」區段顯示同樣的幾列 (鎖定檔、伺服器、緊急開關、策略基準、判定), 措辭來自主機; 其身分區段顯示主機金鑰存放在哪裡, 與 `enclave-status` 印出的一致。
@@ -141,7 +142,7 @@ Chrome 自己的位置來自其文件。其他廠商的位置是從它們存放�
 
 - `genkan pair` 要求你在終端機輸入一段確認 (以管線輸入的 stdin 在任何提示出現之前就被拒絕), 產生一把 P-256 主機金鑰, 把它存放在作業系統的憑證存放區 (鑰匙圈、認證管理員或 Secret Service), 並印出金鑰的 SHA-256 指紋。把這個指紋與擴充功能登記畫面顯示的指紋比對; 不一致表示兩者之間夾了別的東西。
 - `genkan pair --file-store` 改為把金鑰存放在執行階段目錄中的一個 0600 檔案, 供沒有可用憑證存放區的機器使用。這個選擇是明確的: 存放區失敗會被回報, 絕不會悄悄改寫到檔案。
-- `genkan pair --reset` 先要求確認, 然後移除先前的金鑰 (不論哪個存放區持有它) 並產生一把新的; 擴充功能必須重新固定。瀏覽器登記與用戶端配對維持不變。
+- `genkan pair --reset` 先要求確認, 然後移除先前的金鑰 (不論哪個存放區持有它) 並產生一把新的; 擴充功能必須重新固定, 已簽署的政策基線隨金鑰一併清除 (無法讀取的基線會被留下並記錄)。瀏覽器登記與用戶端配對維持不變。
 - 當憑證存放區沒有回應時, `--file-store` 的重置會繼續進行, 並警告存放區中可能仍留有一筆項目。等存放區恢復回應後再執行一次 `pair --reset`; `revoke --all` 也可以, 但它還會忘記每一個瀏覽器與用戶端。
 - `genkan enclave-status [--json]` 以唯讀方式回報目前狀態: 是否存在金鑰、哪個存放區持有它, 以及它的指紋。
 
@@ -164,7 +165,7 @@ CLI 從不發出那個提示: 它自己的授予 (`pair`、`pair-client`、`unki
 
 ```text
 genkan pair-client --name claude-code --this-parent
-genkan pair-client --name codex --hash <sha256-hex>
+genkan pair-client --name codex --hash <hex>
 genkan pair-client --name claude-desktop --signer <signer-id>
 genkan list-clients
 genkan revoke-client --name codex
@@ -212,7 +213,7 @@ genkan policy history [--json]           # read-only: superseded revisions
 genkan policy rollback --revision <n> [--entry <id>] [--json]
 ```
 
-**欄位旗標。** `set` 與 `restrict` 共用同一組旗標, 每個策略欄位一個, 寫法是其 camelCase 線路名稱的 kebab-case 形式: `--cdp-mode`、`--file-upload`、`--handle-dialog`、`--page-eval`、`--confirm-high-risk-click`、`--confirm-page-eval`、`--presence-confirm`、`--confirm-tab-close`、`--warn-precise-snapshot`、`--eval-mask`、`--host-reverify-ms`、`--confirm-grace-ms`、`--click-toast-timeout-ms`、`--eval-toast-timeout-ms` 與 `--disabled-tools`。
+**欄位旗標。** `set` 與 `restrict` 共用同一組旗標, 每個策略欄位一個, 寫法是其 camelCase 線路名稱去掉 `Enabled` 字尾後的 kebab-case 形式: `--cdp-mode`、`--file-upload`、`--handle-dialog`、`--page-eval`、`--confirm-high-risk-click`、`--confirm-page-eval`、`--presence-confirm`、`--confirm-tab-close`、`--warn-precise-snapshot`、`--eval-mask`、`--host-reverify-ms`、`--confirm-grace-ms`、`--click-toast-timeout-ms`、`--eval-toast-timeout-ms` 與 `--disabled-tools`。
 
 | 旗標種類 | 值 |
 | --- | --- |
@@ -286,8 +287,8 @@ genkan lang set zh_TW    # one of: auto, en, zh_CN, zh_TW
 ```text
 $ genkan audit --limit 20
 2026-07-17 19:04:11.201Z  kill_engage     surface=cli outcome=ok
-2026-07-17 19:04:12.480Z  tool_call       tool=tab_list outcome=error code=BRIDGE_KILLED dur_ms=0
-2026-07-17 19:05:02.913Z  kill_release    surface=cli outcome=ok
+2026-07-17 19:04:12.480Z  tool_call       req=3 tool=tab_list outcome=error code=BRIDGE_KILLED dur_ms=0
+2026-07-17 19:05:02.913Z  kill_release    surface=cli outcome=ok detail=auth=tty
 ```
 
 讀取器無法解析的記錄會顯示為 `UNRECOGNIZED RECORD` 並計數, 絕不猜測; `dropped=n` 欄位標記因寫入失敗 (例如磁碟已滿) 而遺失的記錄。記錄過程絕不阻塞或導致操作失敗: 稽核日誌觀察決定, 不把關決定。
