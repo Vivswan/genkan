@@ -25,8 +25,13 @@ import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import puppeteer, { type Browser, type Target } from "puppeteer-core";
-import { assertIsolatedBrowserOrSkip, extensionDir, finishSuite } from "./browser-safety";
+import puppeteer, { type Browser } from "puppeteer-core";
+import {
+  assertIsolatedBrowserOrSkip,
+  extensionDir,
+  finishSuite,
+  serviceWorkerWhere,
+} from "./browser-safety";
 
 const EXTENSION_DIR = extensionDir();
 const CHROME = process.env.CHROME_BIN ?? "";
@@ -43,23 +48,13 @@ function check(cond: boolean, label: string, detail?: unknown): void {
   }
 }
 
-/** Our extension's id, found by its distinctive `nativeMessaging` permission (Chrome for Testing ships
- * component extensions whose service workers also match a naive type filter). */
+/** Our extension's id, by its distinctive `nativeMessaging` permission. */
 async function findExtensionId(browser: Browser): Promise<string> {
-  for (let i = 0; i < 40; i++) {
-    for (const t of browser.targets().filter((x: Target) => x.type() === "service_worker")) {
-      const w = await t.worker().catch(() => null);
-      if (!w) continue;
-      const perms = (await w
-        .evaluate(() => chrome.runtime.getManifest().permissions ?? [])
-        .catch(() => [])) as string[];
-      if (perms.includes("nativeMessaging")) {
-        return (await w.evaluate(() => chrome.runtime.id)) as string;
-      }
-    }
-    await Bun.sleep(500);
-  }
-  throw new Error("extension service worker not found");
+  const { worker } = await serviceWorkerWhere(
+    browser,
+    (m) => m.permissions?.includes("nativeMessaging") === true,
+  );
+  return (await worker.evaluate(() => chrome.runtime.id)) as string;
 }
 
 const b64url = (bytes: Uint8Array): string => Buffer.from(bytes).toString("base64url");

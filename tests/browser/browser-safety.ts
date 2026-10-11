@@ -19,6 +19,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { Browser, Target, WebWorker } from "puppeteer-core";
 
 const ISOLATED_VERSION = /Chrome for Testing|HeadlessShell/;
 
@@ -105,6 +106,39 @@ export function writeHostWrapper(
     mode: 0o755,
   });
   return wrapper;
+}
+
+/** The manifest fields a suite picks its service worker by. */
+export interface ManifestFacts {
+  readonly name?: string;
+  readonly permissions?: readonly string[];
+}
+
+/**
+ * The extension service worker whose manifest satisfies `match`, through Puppeteer's own target watcher.
+ * Chrome for Testing ships component extensions whose workers also pass a `type === "service_worker"` filter
+ * and would hand a suite the wrong extension id, so the manifest decides. Times out with Puppeteer's error.
+ */
+export async function serviceWorkerWhere(
+  browser: Browser,
+  match: (manifest: ManifestFacts) => boolean,
+  timeoutMs = 20_000,
+): Promise<{ target: Target; worker: WebWorker; id: string }> {
+  const target = await browser.waitForTarget(
+    async (t) => {
+      if (t.type() !== "service_worker") return false;
+      const w = await t.worker().catch(() => null);
+      if (!w) return false;
+      const manifest = (await w
+        .evaluate(() => chrome.runtime.getManifest())
+        .catch(() => null)) as ManifestFacts | null;
+      return manifest !== null && match(manifest);
+    },
+    { timeout: timeoutMs },
+  );
+  const worker = await target.worker();
+  if (!worker) throw new Error("service worker target lost its worker");
+  return { target, worker, id: target.url().match(/^chrome-extension:\/\/([a-p]+)\//)?.[1] ?? "" };
 }
 
 /** Whether `lockPath`, the lock the binary says it resolves under a suite's environment, sits inside the

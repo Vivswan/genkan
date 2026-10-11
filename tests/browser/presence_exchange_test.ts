@@ -26,13 +26,13 @@ import puppeteer, {
   type CDPSession,
   type ElementHandle,
   type Page,
-  type Target,
 } from "puppeteer-core";
 import {
   assertHostIsolated,
   assertIsolatedBrowserOrSkip,
   extensionDir,
   finishSuite,
+  serviceWorkerWhere,
   throwawayHostEnv,
   writeHostWrapper,
 } from "./browser-safety";
@@ -60,18 +60,7 @@ function check(cond: boolean, label: string, detail?: unknown): void {
 
 /** Our extension's service worker, by its distinctive `nativeMessaging` permission. */
 async function waitForExtension(browser: Browser): Promise<void> {
-  for (let i = 0; i < 40; i++) {
-    for (const t of browser.targets().filter((x: Target) => x.type() === "service_worker")) {
-      const w = await t.worker().catch(() => null);
-      if (!w) continue;
-      const perms = (await w
-        .evaluate(() => chrome.runtime.getManifest().permissions ?? [])
-        .catch(() => [])) as string[];
-      if (perms.includes("nativeMessaging")) return;
-    }
-    await Bun.sleep(500);
-  }
-  throw new Error("extension service worker not found");
+  await serviceWorkerWhere(browser, (m) => m.permissions?.includes("nativeMessaging") === true);
 }
 
 /** Register the real host in a throwaway profile through the wrapper that sets the isolated runtime dir and

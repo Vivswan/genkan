@@ -20,7 +20,12 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import puppeteer, { type Target } from "puppeteer-core";
-import { assertIsolatedBrowserOrSkip, extensionDir, finishSuite } from "./browser-safety";
+import {
+  assertIsolatedBrowserOrSkip,
+  extensionDir,
+  finishSuite,
+  serviceWorkerWhere,
+} from "./browser-safety";
 
 // The load-unpacked target is the built bundle (GENKAN_EXT_DIR overrides; the
 // env var name and default path live in browser-safety.ts, shared by every
@@ -95,26 +100,14 @@ async function main(): Promise<void> {
   });
 
   try {
-    // Find OUR extension's service worker. Chrome for Testing ships built-in
-    // component extensions whose service workers ALSO match a naive
-    // type === "service_worker" filter (and would give a wrong extension ID
-    // and wrong permission readout), so select by our distinctive
-    // `nativeMessaging` permission.
-    let sw: Target | undefined;
-    for (let i = 0; i < 30 && !sw; i++) {
-      for (const t of browser.targets().filter((x) => x.type() === "service_worker")) {
-        const w = await t.worker().catch(() => null);
-        if (!w) continue;
-        const perms = (await w
-          .evaluate(() => chrome.runtime.getManifest().permissions ?? [])
-          .catch(() => [])) as string[];
-        if (perms.includes("nativeMessaging")) {
-          sw = t;
-          break;
-        }
-      }
-      if (!sw) await Bun.sleep(500);
-    }
+    // Ours is the one with the distinctive `nativeMessaging` permission.
+    const sw: Target | undefined = await serviceWorkerWhere(
+      browser,
+      (m) => m.permissions?.includes("nativeMessaging") === true,
+      15_000,
+    )
+      .then((found) => found.target)
+      .catch(() => undefined);
     check(!!sw, "extension service worker target exists");
     if (!sw) {
       console.log(
