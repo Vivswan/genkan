@@ -234,140 +234,261 @@ fn serialized_bytes_are_the_signed_wire_contract() {
     assert_eq!(serde_json::from_str::<PolicyDoc>(&doc_json).unwrap(), doc);
 }
 
+/// The one refusal every bounded integer lane spells.
+const BOUND_ERR: &str = "value exceeds the JS-safe integer bound (2^53 - 1)";
+
+/// serde's "expected one of" tail for `names`, as a strict parser spells its refusal.
+fn one_of(names: impl IntoIterator<Item = &'static str>) -> String {
+    names
+        .into_iter()
+        .map(|n| format!("`{n}`"))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// The catalogue's wire names in wire order: the field set every strict parser names when it refuses.
+fn catalogue_names() -> impl Iterator<Item = &'static str> {
+    PolicyField::ALL.iter().map(|f| f.wire_name())
+}
+
+fn default_doc_with(key: &str, value: serde_json::Value) -> serde_json::Value {
+    let mut doc = serde_json::to_value(PolicyDoc::default()).unwrap();
+    doc[key] = value;
+    doc
+}
+
+fn default_doc_with_ms(field: MsField, ms: Ms) -> PolicyDoc {
+    let mut values = PolicyValues::default();
+    *values.ms_mut(field) = ms;
+    PolicyDoc::from_values(&values, 0, Vec::new())
+}
+
+fn overlay_with_ms(field: MsField, ms: Ms) -> PolicyOverlay {
+    let mut overlay = PolicyOverlay::default();
+    *overlay.ms_mut(field) = Some(ms);
+    overlay
+}
+
+/// The document parser is the fail-closed half of the signed contract. The revision and every
+/// millisecond field parse only inside the JS-safe bound the generated Zod (`z.int()`) shares, so a
+/// value the extension would refuse never signs or stores host-side; a `touched` set names only a
+/// catalogue field (`requireEnrollment` is retired, `uiLanguage` is deliberately not a policy field,
+/// a case-mangled or empty name is nothing); and an unknown key fails the whole parse.
 #[test]
-fn unknown_touched_field_names_fail_the_parse() {
-    // requireEnrollment is retired and uiLanguage is deliberately not a
-    // policy field; neither may ride into a touched set.
+fn document_parse_pins_the_js_safe_bounds_and_refuses_every_unknown_name() {
+    type Row = (String, serde_json::Value, Result<PolicyDoc, String>);
+    let unknown_variant = |bad: &str| {
+        format!(
+            "unknown variant `{bad}`, expected one of {}",
+            one_of(catalogue_names())
+        )
+    };
+    let unknown_field = |bad: &str| {
+        format!(
+            "unknown field `{bad}`, expected one of {}",
+            one_of(
+                ["v", "revision", "touched"]
+                    .into_iter()
+                    .chain(catalogue_names())
+            )
+        )
+    };
+    let mut rows: Vec<Row> = vec![
+        (
+            "the exact default shape".into(),
+            serde_json::to_value(PolicyDoc::default()).unwrap(),
+            Ok(PolicyDoc::default()),
+        ),
+        (
+            "revision at 2^53 - 1".into(),
+            default_doc_with("revision", json!(JS_SAFE_INT_MAX)),
+            Ok(PolicyDoc {
+                revision: JS_SAFE_INT_MAX,
+                ..PolicyDoc::default()
+            }),
+        ),
+        (
+            "revision at 2^53".into(),
+            default_doc_with("revision", json!(JS_SAFE_INT_MAX + 1)),
+            Err(BOUND_ERR.into()),
+        ),
+        (
+            "an unknown top-level key".into(),
+            default_doc_with("surprise", json!(true)),
+            Err(unknown_field("surprise")),
+        ),
+    ];
     for bad in ["requireEnrollment", "uiLanguage", "bogus", "cdpmode", ""] {
-        assert!(
-            serde_json::from_value::<PolicyField>(json!(bad)).is_err(),
-            "field name {bad:?} must be refused"
-        );
+        rows.push((
+            format!("{bad:?} in touched"),
+            default_doc_with("touched", json!(["pageEvalEnabled", bad])),
+            Err(unknown_variant(bad)),
+        ));
     }
-    let mut doc = serde_json::to_value(PolicyDoc::default()).unwrap();
-    doc["touched"] = json!(["pageEvalEnabled", "requireEnrollment"]);
-    assert!(serde_json::from_value::<PolicyDoc>(doc).is_err());
-}
-
-#[test]
-fn revision_parses_only_inside_the_js_safe_bound() {
-    let mut doc = serde_json::to_value(PolicyDoc::default()).unwrap();
-    doc["revision"] = json!(9_007_199_254_740_991u64);
-    let parsed: PolicyDoc = serde_json::from_value(doc.clone()).unwrap();
-    assert_eq!(parsed.revision, JS_SAFE_INT_MAX);
-    doc["revision"] = json!(9_007_199_254_740_992u64);
-    assert!(serde_json::from_value::<PolicyDoc>(doc).is_err());
-    // validate() covers the constructed-in-code path the parser never
-    // sees (set_signed must refuse before any prompt).
-    let over = PolicyDoc {
-        revision: JS_SAFE_INT_MAX + 1,
-        ..PolicyDoc::default()
-    };
-    assert!(over.validate().is_err());
-    assert!(PolicyDoc::default().validate().is_ok());
-}
-
-#[test]
-fn validate_refuses_a_foreign_document_version() {
-    let doc = PolicyDoc {
-        v: POLICY_DOC_VERSION + 1,
-        ..PolicyDoc::default()
-    };
-    assert!(doc.validate().is_err());
-}
-
-#[test]
-fn ms_fields_parse_only_inside_the_js_safe_bound() {
-    // The generated Zod (z.int()) refuses unsafe integers: without this
-    // bound a huge millisecond value would sign and store host-side while
-    // the extension refuses the push. Document and overlay lanes alike; a
-    // huge-but-restricting overlay value is a legal restriction under the
-    // zero-top order, so the overlay lane needs the bound just as much.
-    for field in PolicyField::ALL
-        .iter()
-        .filter(|f| matches!(f.kind(), FieldKind::Ms(_)))
-    {
+    for field in PolicyField::ALL {
+        let FieldKind::Ms(ms) = field.kind() else {
+            continue;
+        };
         let name = field.wire_name();
-        let mut doc = serde_json::to_value(PolicyDoc::default()).unwrap();
-        doc[name] = json!(JS_SAFE_INT_MAX);
-        assert!(
-            serde_json::from_value::<PolicyDoc>(doc.clone()).is_ok(),
-            "{name} must accept 2^53 - 1"
-        );
-        doc[name] = json!(JS_SAFE_INT_MAX + 1);
-        assert!(
-            serde_json::from_value::<PolicyDoc>(doc).is_err(),
-            "{name} must refuse 2^53"
-        );
-        assert!(
-            serde_json::from_value::<PolicyOverlay>(json!({ name: JS_SAFE_INT_MAX })).is_ok(),
-            "overlay {name} must accept 2^53 - 1"
-        );
-        assert!(
-            serde_json::from_value::<PolicyOverlay>(json!({ name: JS_SAFE_INT_MAX + 1 })).is_err(),
-            "overlay {name} must refuse 2^53"
+        rows.push((
+            format!("{name} at 2^53 - 1"),
+            default_doc_with(name, json!(JS_SAFE_INT_MAX)),
+            Ok(default_doc_with_ms(
+                ms,
+                Ms::try_from(JS_SAFE_INT_MAX).unwrap(),
+            )),
+        ));
+        rows.push((
+            format!("{name} at 2^53"),
+            default_doc_with(name, json!(JS_SAFE_INT_MAX + 1)),
+            Err(BOUND_ERR.into()),
+        ));
+    }
+    for (label, input, expected) in rows {
+        assert_eq!(
+            serde_json::from_value::<PolicyDoc>(input).map_err(|e| e.to_string()),
+            expected,
+            "{label}"
         );
     }
-    // Absent fields stay None through the bounded deserializer.
-    let empty: PolicyOverlay = serde_json::from_value(json!({})).unwrap();
-    assert_eq!(empty, PolicyOverlay::default());
 }
 
+/// `validate()` covers the constructed-in-code path the parser never sees: `set_signed` runs it
+/// before any presence prompt and the read path refuses a store it could not round-trip. The version
+/// must be ours, the revision must fit the JS-safe bound, and `disabledTools` must fit the bounds that
+/// keep every valid document under the store's write cap and inside what the comma-joined argv
+/// transport (`cli::parse_tool_list` re-splits and trims) can round-trip: a comma inside a name
+/// (split in two), surrounding whitespace (trimmed away), or a whitespace-only name (trimmed to
+/// empty and dropped) would sign something other than what was written, so each is REFUSED, never
+/// mangled.
 #[test]
-fn validate_bounds_disabled_tools_entries() {
-    // An oversized list must never validate: the store's write cap
-    // refuses to persist what load cannot read back, and these bounds
-    // are what keep every valid document under it.
-    let doc = |tools: Vec<String>| PolicyDoc {
+fn validate_pins_the_version_the_revision_bound_and_every_disabled_tools_rule() {
+    const SIZE: &str = "a disabledTools entry is empty or longer than 128 bytes";
+    const COMMA: &str = "a disabledTools entry contains a comma, which the comma-joined CLI \
+                         transport cannot round-trip";
+    const SPACE: &str = "a disabledTools entry carries surrounding whitespace, which the CLI \
+                         transport's trimming re-split cannot round-trip";
+    let tools = |tools: Vec<String>| PolicyDoc {
         disabled_tools: tools,
         ..PolicyDoc::default()
     };
-    assert!(doc(vec!["t".into(); DISABLED_TOOLS_MAX_ENTRIES])
-        .validate()
-        .is_ok());
-    assert!(doc(vec!["t".into(); DISABLED_TOOLS_MAX_ENTRIES + 1])
-        .validate()
-        .is_err());
-    assert!(doc(vec!["a".repeat(DISABLED_TOOL_NAME_MAX_BYTES)])
-        .validate()
-        .is_ok());
-    assert!(doc(vec!["a".repeat(DISABLED_TOOL_NAME_MAX_BYTES + 1)])
-        .validate()
-        .is_err());
-    assert!(doc(vec![String::new()]).validate().is_err());
+    let one = |name: &str| tools(vec![name.into()]);
+    let rows: Vec<(&str, PolicyDoc, Result<(), &str>)> = vec![
+        ("the default document", PolicyDoc::default(), Ok(())),
+        (
+            "revision one past the bound",
+            PolicyDoc {
+                revision: JS_SAFE_INT_MAX + 1,
+                ..PolicyDoc::default()
+            },
+            Err("revision exceeds the JS-safe integer bound (2^53 - 1)"),
+        ),
+        (
+            "a foreign document version",
+            PolicyDoc {
+                v: POLICY_DOC_VERSION + 1,
+                ..PolicyDoc::default()
+            },
+            Err("unsupported policy document version"),
+        ),
+        (
+            "ordinary names",
+            tools(vec!["page_eval".into(), "tab_close".into()]),
+            Ok(()),
+        ),
+        ("256 entries", tools(vec!["t".into(); 256]), Ok(())),
+        (
+            "257 entries",
+            tools(vec!["t".into(); 257]),
+            Err("disabledTools carries more than 256 entries"),
+        ),
+        ("a 128-byte name", one(&"a".repeat(128)), Ok(())),
+        ("a 129-byte name", one(&"a".repeat(129)), Err(SIZE)),
+        ("an empty name", one(""), Err(SIZE)),
+        (
+            "a NUL byte inside a name",
+            one("page\0eval"),
+            Err("a disabledTools entry contains a NUL byte"),
+        ),
+        ("a comma inside a name", one("a,b"), Err(COMMA)),
+        ("a lone comma", one(","), Err(COMMA)),
+        ("a trailing comma", one("page_eval,"), Err(COMMA)),
+        ("leading whitespace", one(" page_eval"), Err(SPACE)),
+        ("trailing whitespace", one("page_eval "), Err(SPACE)),
+        ("a leading tab", one("\tx"), Err(SPACE)),
+        ("a whitespace-only name", one(" "), Err(SPACE)),
+    ];
+    for (label, doc, expected) in rows {
+        assert_eq!(doc.validate(), expected, "{label}");
+    }
 }
 
+/// The overlay parser is the same fail-closed contract on the unsigned lane. A huge-but-restricting
+/// millisecond value is a legal restriction under the zero-top order, so the JS-safe bound must hold
+/// here as much as in the document; an absent field stays absent through the bounded deserializer;
+/// and an unknown key, the retired and excluded settings.ts fields included, fails the parse.
 #[test]
-fn validate_refuses_entries_the_cli_transport_cannot_round_trip() {
-    // Structural comma fidelity: the co-equal surfaces ship the list as
-    // one comma-joined argv value that parse_tool_list re-splits and
-    // trims, so a comma inside a name (split into two), surrounding
-    // whitespace (trimmed away), or a whitespace-only name (trimmed to
-    // empty and dropped) would sign something other than what was
-    // written. Every such entry is REFUSED at the validation seams both
-    // lanes share - never mangled.
-    let doc = |tools: Vec<String>| PolicyDoc {
-        disabled_tools: tools,
-        ..PolicyDoc::default()
+fn overlay_parse_pins_the_js_safe_bound_and_refuses_every_unknown_name() {
+    type Row = (String, serde_json::Value, Result<PolicyOverlay, String>);
+    let unknown_field = |bad: &str| {
+        format!(
+            "unknown field `{bad}`, expected one of {}",
+            one_of(catalogue_names())
+        )
     };
-    for bad in [
-        "a,b",
-        ",",
-        "page_eval,",
-        " page_eval",
-        "page_eval ",
-        "\tx",
-        " ",
-    ] {
-        assert!(
-            doc(vec![bad.into()]).validate().is_err(),
-            "{bad:?} must fail validate()"
+    let mut rows: Vec<Row> = vec![
+        (
+            "the empty overlay".into(),
+            json!({}),
+            Ok(PolicyOverlay::default()),
+        ),
+        (
+            "one present entry".into(),
+            json!({ "disabledTools": ["page_eval"] }),
+            Ok(PolicyOverlay {
+                disabled_tools: Some(vec!["page_eval".into()]),
+                ..PolicyOverlay::default()
+            }),
+        ),
+        (
+            "an unknown key beside a present entry".into(),
+            json!({ "disabledTools": ["page_eval"], "surprise": true }),
+            Err(unknown_field("surprise")),
+        ),
+        (
+            "the retired requireEnrollment".into(),
+            json!({ "requireEnrollment": false }),
+            Err(unknown_field("requireEnrollment")),
+        ),
+        (
+            "the excluded uiLanguage".into(),
+            json!({ "uiLanguage": "en" }),
+            Err(unknown_field("uiLanguage")),
+        ),
+    ];
+    for field in PolicyField::ALL {
+        let FieldKind::Ms(ms) = field.kind() else {
+            continue;
+        };
+        let name = field.wire_name();
+        rows.push((
+            format!("{name} at 2^53 - 1"),
+            json!({ name: JS_SAFE_INT_MAX }),
+            Ok(overlay_with_ms(ms, Ms::try_from(JS_SAFE_INT_MAX).unwrap())),
+        ));
+        rows.push((
+            format!("{name} at 2^53"),
+            json!({ name: JS_SAFE_INT_MAX + 1 }),
+            Err(BOUND_ERR.into()),
+        ));
+    }
+    for (label, input, expected) in rows {
+        assert_eq!(
+            serde_json::from_value::<PolicyOverlay>(input).map_err(|e| e.to_string()),
+            expected,
+            "{label}"
         );
     }
-    // Positive control: ordinary names still validate.
-    assert!(doc(vec!["page_eval".into(), "tab_close".into()])
-        .validate()
-        .is_ok());
 }
 
 #[test]
@@ -397,35 +518,6 @@ fn the_deny_baseline_sits_at_every_boolean_restrictive_pole() {
             field.wire_name()
         );
     }
-}
-
-#[test]
-fn unknown_fields_are_rejected_fail_closed() {
-    let mut doc = serde_json::to_value(PolicyDoc::default()).unwrap();
-    // Positive control: the exact shape parses.
-    assert!(serde_json::from_value::<PolicyDoc>(doc.clone()).is_ok());
-    doc["surprise"] = json!(true);
-    assert!(serde_json::from_value::<PolicyDoc>(doc).is_err());
-
-    assert!(serde_json::from_value::<PolicyOverlay>(json!({})).is_ok());
-    assert!(serde_json::from_value::<PolicyOverlay>(json!({
-        "disabledTools": ["page_eval"],
-    }))
-    .is_ok());
-    assert!(serde_json::from_value::<PolicyOverlay>(json!({
-        "disabledTools": ["page_eval"],
-        "surprise": true,
-    }))
-    .is_err());
-    // The retired / excluded settings.ts fields are unknown here too.
-    assert!(serde_json::from_value::<PolicyOverlay>(json!({
-        "requireEnrollment": false,
-    }))
-    .is_err());
-    assert!(serde_json::from_value::<PolicyOverlay>(json!({
-        "uiLanguage": "en",
-    }))
-    .is_err());
 }
 
 #[test]

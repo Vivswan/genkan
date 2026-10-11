@@ -1165,28 +1165,28 @@ fn webauthn_outcomes_map_onto_the_pinned_wire_shapes() {
 }
 
 #[test]
-fn policy_current_serializes_exactly_its_pinned_key_set() {
+fn policy_current_fully_populated_maps_onto_the_pinned_wire_shape() {
     // Verification and the ratchet key on the extension's own pin and nothing else - a frame-supplied key
-    // id would hand a substituted host a ratchet-reset lever. Pin the fully-populated frame's serialized
-    // keys so no key-identity field (or anything else) can ever join it unnoticed.
-    let frame = PolicyControl::PolicyCurrent {
-        ok: true,
-        baseline: Some("YmFzZQ==".into()),
-        sig: Some("c2ln".into()),
-        overlay: Some(crate::policy::PolicyOverlay::default()),
-        error: Some("e".into()),
-    };
-    let value = serde_json::to_value(&frame).unwrap();
-    let keys: BTreeSet<&str> = value
-        .as_object()
-        .unwrap()
-        .keys()
-        .map(String::as_str)
-        .collect();
-    let expected: BTreeSet<&str> = ["type", "ok", "baseline", "sig", "overlay", "error"]
-        .into_iter()
-        .collect();
-    assert_eq!(keys, expected);
+    // id would hand a substituted host a ratchet-reset lever. Pin the fully-populated frame's complete
+    // JSON value so no key-identity field (or anything else) can ever join it unnoticed.
+    assert_eq!(
+        serde_json::to_value(PolicyControl::PolicyCurrent {
+            ok: true,
+            baseline: Some("YmFzZQ==".into()),
+            sig: Some("c2ln".into()),
+            overlay: Some(crate::policy::PolicyOverlay::default()),
+            error: Some("e".into()),
+        })
+        .unwrap(),
+        json!({
+            "type": "policy_current",
+            "ok": true,
+            "baseline": "YmFzZQ==",
+            "sig": "c2ln",
+            "overlay": {},
+            "error": "e",
+        })
+    );
 }
 
 #[test]
