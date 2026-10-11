@@ -1,7 +1,7 @@
-//! Quarantined libc shims: the only `unsafe` outside the FFI modules (`ipc::platform`, `ipc::peercred`),
-//! each behind a safe function so no caller holds an `unsafe` block. `geteuid`/`getppid` are infallible by
-//! POSIX contract, and ignoring SIGPIPE cannot fail for that signal; the signal-cleanup thread holds no
-//! unsafe at all, since signal-hook owns the handler.
+//! Process and clock shims, and the one quarantined libc call: the only `unsafe` outside the FFI modules
+//! (`ipc::platform`, `ipc::peercred`), behind a safe function so no caller holds an `unsafe` block.
+//! Ignoring SIGPIPE cannot fail for that signal; the signal-cleanup thread holds no unsafe at all, since
+//! signal-hook owns the handler.
 #![cfg_attr(
     unix,
     expect(
@@ -14,15 +14,21 @@
 /// error returns for it).
 #[cfg(unix)]
 pub(crate) fn effective_uid() -> libc::uid_t {
-    // SAFETY: geteuid takes no pointers and has no failure mode.
-    unsafe { libc::geteuid() }
+    nix::unistd::geteuid().as_raw()
+}
+
+/// Seconds since the Unix epoch, 0 for a clock set before it: the value stamped on trust records.
+pub(crate) fn now_unix() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
 }
 
 /// The PID of this process's current parent. `getppid` cannot fail.
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 pub(crate) fn parent_pid() -> libc::pid_t {
-    // SAFETY: getppid takes no pointers and has no failure mode.
-    unsafe { libc::getppid() }
+    nix::unistd::getppid().as_raw()
 }
 
 /// SIGPIPE protection. On Unix, writing to a closed stdout/socket raises

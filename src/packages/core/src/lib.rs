@@ -1,10 +1,11 @@
 //! genkan-core - bridge an MCP client (Claude Code, Codex, ...) to your
 //! real Chromium browser.
 //!
-//! One binary (`src/apps/host`), two modes selected by argv:
+//! One binary (`src/apps/host`), two long-running modes plus the CLI subcommands of `cli.rs`:
 //! - (no args): MCP server (default). Run under your MCP client's server config.
-//! - --native-host: Chrome-spawned bridge subprocess. Chrome launches this
-//!   via the native messaging host manifest; it should never be invoked by hand.
+//! - --native-host: Chrome-spawned bridge subprocess. Chrome launches this via the native messaging
+//!   host manifest (on Windows by a leading `chrome-extension://` argument instead of the flag); it
+//!   should never be invoked by hand.
 //!
 //! This library exposes every module so the modules are reachable from the
 //! host binary, integration tests, and future consumers.
