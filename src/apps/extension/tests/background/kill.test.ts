@@ -317,14 +317,13 @@ describe("kill frame boundaries", () => {
     expect(isKillStatusFrame({ type: "kill_status_result", ok: true, killed: false })).toBe(true);
   });
 
-  test("outbound control frames are a closed union", () => {
-    const post = (frame: KillControlFrame): KillControlFrame => frame;
-    expect(post({ type: "kill_engage" }).type).toBe("kill_engage");
-    // @ts-expect-error - a typo'd control frame must not compile; the old
-    // string-sniffed cast would have posted it for real without ever arming
-    // the panic-brake re-post
-    post({ type: "kill_engag" });
-  });
+  // Type-level pin, enforced by tsc (moon typecheck), never by vitest:
+  // outbound control frames are a closed union, so a typo'd control frame
+  // does not compile. The old string-sniffed cast would have posted it for
+  // real without ever arming the panic-brake re-post.
+  const post = (frame: KillControlFrame): KillControlFrame => frame;
+  // @ts-expect-error - "kill_engag" is not a control frame tag
+  post({ type: "kill_engag" });
 
   test("a status request never arms the engage re-post", async () => {
     attach(collaborator);

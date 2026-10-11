@@ -72,122 +72,167 @@ describe("prepare accepts the shapes schemars actually emits", () => {
   });
 });
 
+// prepare's whole outcome as one value: the rule it aborted on, or the schema it produced.
+const outcomeOf = (schema: unknown) => {
+  try {
+    return { returns: prepare(schema, "$") };
+  } catch (e) {
+    return { throws: e instanceof Error ? e.message : String(e) };
+  }
+};
+const aborts = (rule: string) => ({ throws: expect.stringContaining(rule) });
+const yields = (value: unknown) => ({ returns: value });
+
 describe("prepare aborts on anything that would convert weaker (G1/G3/G4/G5)", () => {
-  test("G1: object-shaped keywords without type: object (the object claim must be explicit)", () => {
-    expect(() =>
-      prepare({ properties: { secret: { type: "string" } }, required: ["secret"] }, "$"),
-    ).toThrow("G1");
-    expect(() => prepare({ additionalProperties: false }, "$")).toThrow("G1");
-    expect(() => prepare({ type: ["object", "null"], additionalProperties: false }, "$")).toThrow(
-      "G1",
-    );
-  });
-
-  test("G1: an object without deny_unknown_fields", () => {
-    expect(() => prepare({ type: "object", properties: {} }, "$")).toThrow("G1");
-    expect(() =>
-      prepare({ type: "object", additionalProperties: { type: "string" }, properties: {} }, "$"),
-    ).toThrow("G1");
-  });
-
-  test("G5: arrays without a single object items schema (z.array(z.any()) is weaker)", () => {
-    expect(() => prepare({ type: "array" }, "$")).toThrow("G5");
-    expect(() => prepare({ type: "array", items: false }, "$")).toThrow("G5");
-    expect(() => prepare({ type: "array", items: true }, "$")).toThrow("G5");
-    expect(() => prepare({ type: "array", items: [{ type: "string" }] }, "$")).toThrow("G5");
-    expect(() => prepare({ items: { type: "string" } }, "$")).toThrow("G5");
-    // The null arm is the only companion type items admits (Option<Vec<_>>);
-    // anything else beside "array" would leave items unenforced on it.
-    expect(() => prepare({ type: ["array", "string"], items: { type: "string" } }, "$")).toThrow(
-      "G5",
-    );
-  });
-
-  test("serde's Option<Vec<_>> null-arm beside an array is inert and allowed", () => {
-    const optionVec = { type: ["array", "null"], items: { type: "string" } };
-    expect(prepare(optionVec, "$")).toEqual(optionVec);
-  });
-
-  test("G5: keywords the generator does not model", () => {
-    for (const extra of [
-      { minProperties: 1 },
-      { patternProperties: { "^x": { type: "string" } } },
-      { contains: { type: "string" } },
-      { not: { type: "string" } },
-      { allOf: [{ type: "string" }] },
-    ]) {
-      expect(() => prepare({ type: "object", additionalProperties: false, ...extra }, "$")).toThrow(
-        "G5",
-      );
-    }
-  });
-
-  test("G5: unknown types, non-string consts, boolean false schema", () => {
-    expect(() => prepare({ type: "integer-ish" }, "$")).toThrow("G5");
-    expect(() => prepare({ type: "string", const: 7 }, "$")).toThrow("G5");
-    expect(() => prepare(false, "$")).toThrow("unsupported schema form");
-  });
-
-  test("G4: unresolved $ref", () => {
-    expect(() => prepare({ $ref: "#/$defs/Anchor" }, "$")).toThrow("G4");
-  });
-
-  test("G3: an undiscriminated oneOf (z.union would erase its exclusivity claim)", () => {
-    const branch = (tag: string) =>
-      strictObject({ kind: { type: "string", const: tag } }, ["kind"]);
-    expect(() => prepare({ oneOf: [branch("a"), branch("a")] }, "$")).toThrow("G3");
-    expect(() =>
-      prepare({ oneOf: [branch("a"), strictObject({ kind: { type: "string" } }, ["kind"])] }, "$"),
-    ).toThrow("G3");
-    expect(() => prepare({ oneOf: [{ type: "string" }, { type: "integer" }] }, "$")).toThrow("G3");
-  });
-
-  test("G5: degenerate unions (no single faithful Zod form)", () => {
-    //   anyOf: [] / oneOf: []                 -> an empty union claims nothing
-    //   a constraint beside a combinator      -> it would have to be dropped
-    //   anyOf and oneOf on one node           -> one wins, the other is lost
-    expect(() => prepare({ anyOf: [] }, "$")).toThrow("G5");
-    expect(() => prepare({ oneOf: [] }, "$")).toThrow("G5");
-    expect(() =>
-      prepare({ type: "number", minimum: 5, anyOf: [{ type: "number", maximum: 10 }] }, "$"),
-    ).toThrow("G5");
-    expect(() =>
-      prepare({ anyOf: [{ type: "string" }], oneOf: [{ type: "integer" }] }, "$"),
-    ).toThrow("G5");
-  });
-
-  test("G5: keywords in positions the emitter does not model", () => {
-    // format belongs to an integer node only (a string format, or an integer claim on a plain number, would go
-    // unenforced); bounds constrain only numeric nodes; const only strings.
-    expect(() => prepare({ type: "string", format: "uuid" }, "$")).toThrow("G5");
-    expect(() => prepare({ type: "number", format: "int64" }, "$")).toThrow("G5");
-    // A string arm beside the integer arm would give format a string-format meaning.
-    expect(() => prepare({ type: ["integer", "string"], format: "uuid" }, "$")).toThrow("G5");
-    expect(() => prepare({ type: ["string", "number"], format: "uuid" }, "$")).toThrow("G5");
-    expect(() => prepare({ type: "string", minimum: 1 }, "$")).toThrow("G5");
-    expect(() => prepare({ type: "integer", minimum: "0" }, "$")).toThrow("G5");
-    expect(() => prepare({ type: "boolean", maximum: 1 }, "$")).toThrow("G5");
-    // minItems is an array length floor and nothing else.
-    expect(() => prepare({ type: "string", minItems: 1 }, "$")).toThrow("G5");
-    expect(() => prepare({ type: "array", items: { type: "string" }, minItems: -1 }, "$")).toThrow(
-      "G5",
-    );
-    expect(() => prepare({ type: "array", items: { type: "string" }, minItems: 1.5 }, "$")).toThrow(
-      "G5",
-    );
-    expect(() => prepare({ type: "integer", const: "7" }, "$")).toThrow("G5");
-    expect(() => prepare({ type: ["string", "null"], const: "x" }, "$")).toThrow("G5");
-    expect(() => prepare({ type: [] }, "$")).toThrow("G5");
-    // The Option null-arm beside a numeric type is inert and stays allowed.
-    expect(prepare({ type: ["integer", "null"], format: "int64" }, "$")).toEqual({
-      type: ["integer", "null"],
-    });
-  });
-
-  test("required naming a field that does not exist", () => {
-    expect(() => prepare(strictObject({ a: { type: "string" } }, ["a", "ghost"]), "$")).toThrow(
-      "non-property",
-    );
+  const branch = (tag: string) => strictObject({ kind: { type: "string", const: tag } }, ["kind"]);
+  const cases: readonly [string, unknown, ReturnType<typeof aborts | typeof yields>][] = [
+    // G1: the object claim must be explicit, and every object must deny unknown fields.
+    [
+      "G1: properties and required without type: object",
+      { properties: { secret: { type: "string" } }, required: ["secret"] },
+      aborts("G1"),
+    ],
+    [
+      "G1: additionalProperties without type: object",
+      { additionalProperties: false },
+      aborts("G1"),
+    ],
+    [
+      "G1: a nullable object arm without type: object",
+      { type: ["object", "null"], additionalProperties: false },
+      aborts("G1"),
+    ],
+    ["G1: an object without deny_unknown_fields", { type: "object", properties: {} }, aborts("G1")],
+    [
+      "G1: an object whose additionalProperties is a schema, not false",
+      { type: "object", additionalProperties: { type: "string" }, properties: {} },
+      aborts("G1"),
+    ],
+    // G5: arrays without a single object items schema (z.array(z.any()) is weaker).
+    ["G5: an array without items", { type: "array" }, aborts("G5")],
+    ["G5: an array with items: false", { type: "array", items: false }, aborts("G5")],
+    ["G5: an array with items: true", { type: "array", items: true }, aborts("G5")],
+    ["G5: an array with tuple items", { type: "array", items: [{ type: "string" }] }, aborts("G5")],
+    ["G5: items without type: array", { items: { type: "string" } }, aborts("G5")],
+    [
+      // The null arm is the only companion type items admits (Option<Vec<_>>); anything else beside "array" would
+      // leave items unenforced on it.
+      "G5: a string arm beside the array arm with items",
+      { type: ["array", "string"], items: { type: "string" } },
+      aborts("G5"),
+    ],
+    [
+      "serde's Option<Vec<_>> null arm beside an array is inert and allowed",
+      { type: ["array", "null"], items: { type: "string" } },
+      yields({ type: ["array", "null"], items: { type: "string" } }),
+    ],
+    // G5: keywords the generator does not model.
+    [
+      "G5: minProperties",
+      { type: "object", additionalProperties: false, minProperties: 1 },
+      aborts("G5"),
+    ],
+    [
+      "G5: patternProperties",
+      {
+        type: "object",
+        additionalProperties: false,
+        patternProperties: { "^x": { type: "string" } },
+      },
+      aborts("G5"),
+    ],
+    [
+      "G5: contains",
+      { type: "object", additionalProperties: false, contains: { type: "string" } },
+      aborts("G5"),
+    ],
+    [
+      "G5: not",
+      { type: "object", additionalProperties: false, not: { type: "string" } },
+      aborts("G5"),
+    ],
+    [
+      "G5: allOf",
+      { type: "object", additionalProperties: false, allOf: [{ type: "string" }] },
+      aborts("G5"),
+    ],
+    // G5: unknown types, non-string consts, the boolean false schema.
+    ["G5: an unknown type", { type: "integer-ish" }, aborts("G5")],
+    ["G5: a non-string const on a string", { type: "string", const: 7 }, aborts("G5")],
+    ["the boolean false schema is an unsupported form", false, aborts("unsupported schema form")],
+    ["G4: an unresolved $ref", { $ref: "#/$defs/Anchor" }, aborts("G4")],
+    // G3: an undiscriminated oneOf (z.union would erase its exclusivity claim).
+    ["G3: a oneOf whose branches share a tag", { oneOf: [branch("a"), branch("a")] }, aborts("G3")],
+    [
+      "G3: a oneOf with a branch whose tag is not a const",
+      { oneOf: [branch("a"), strictObject({ kind: { type: "string" } }, ["kind"])] },
+      aborts("G3"),
+    ],
+    [
+      "G3: a oneOf of non-object branches",
+      { oneOf: [{ type: "string" }, { type: "integer" }] },
+      aborts("G3"),
+    ],
+    // G5: degenerate unions (no single faithful Zod form): an empty union claims nothing; a constraint beside a
+    // combinator would have to be dropped; anyOf and oneOf on one node means one wins and the other is lost.
+    ["G5: an empty anyOf", { anyOf: [] }, aborts("G5")],
+    ["G5: an empty oneOf", { oneOf: [] }, aborts("G5")],
+    [
+      "G5: a constraint beside a combinator",
+      { type: "number", minimum: 5, anyOf: [{ type: "number", maximum: 10 }] },
+      aborts("G5"),
+    ],
+    [
+      "G5: anyOf and oneOf on one node",
+      { anyOf: [{ type: "string" }], oneOf: [{ type: "integer" }] },
+      aborts("G5"),
+    ],
+    // G5: keywords in positions the emitter does not model. format belongs to an integer node only (a string
+    // format, or an integer claim on a plain number, would go unenforced); bounds constrain only numeric nodes;
+    // const only strings; minItems is an array length floor and nothing else.
+    ["G5: a string format", { type: "string", format: "uuid" }, aborts("G5")],
+    ["G5: an integer format on a plain number", { type: "number", format: "int64" }, aborts("G5")],
+    [
+      // A string arm beside the integer arm would give format a string-format meaning.
+      "G5: a format on an integer-or-string node",
+      { type: ["integer", "string"], format: "uuid" },
+      aborts("G5"),
+    ],
+    [
+      "G5: a format on a string-or-number node",
+      { type: ["string", "number"], format: "uuid" },
+      aborts("G5"),
+    ],
+    ["G5: a numeric bound on a string", { type: "string", minimum: 1 }, aborts("G5")],
+    ["G5: a non-numeric bound value", { type: "integer", minimum: "0" }, aborts("G5")],
+    ["G5: a numeric bound on a boolean", { type: "boolean", maximum: 1 }, aborts("G5")],
+    ["G5: minItems on a string", { type: "string", minItems: 1 }, aborts("G5")],
+    [
+      "G5: a negative minItems",
+      { type: "array", items: { type: "string" }, minItems: -1 },
+      aborts("G5"),
+    ],
+    [
+      "G5: a fractional minItems",
+      { type: "array", items: { type: "string" }, minItems: 1.5 },
+      aborts("G5"),
+    ],
+    ["G5: a const on an integer", { type: "integer", const: "7" }, aborts("G5")],
+    ["G5: a const on a nullable string", { type: ["string", "null"], const: "x" }, aborts("G5")],
+    ["G5: an empty type list", { type: [] }, aborts("G5")],
+    [
+      "the Option null arm beside a numeric type is inert and allowed, its format stripped",
+      { type: ["integer", "null"], format: "int64" },
+      yields({ type: ["integer", "null"] }),
+    ],
+    [
+      "required naming a field that does not exist",
+      strictObject({ a: { type: "string" } }, ["a", "ghost"]),
+      aborts("non-property"),
+    ],
+  ];
+  test.each(cases)("%s", (_, schema, expected) => {
+    expect(outcomeOf(schema)).toEqual(expected);
   });
 });
 

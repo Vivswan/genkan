@@ -18,7 +18,7 @@ import {
   refinementCounterProblems,
   refinementProblems,
 } from "../check-envelope";
-import { GROUPS } from "../gen-envelope";
+import { GROUPS, type Group } from "../gen-envelope";
 
 const pairs = readerPairs();
 
@@ -238,45 +238,49 @@ describe("classifierCoverageProblems", () => {
     }
   });
 
-  test("a writer-only tag added to a classification array is refused", () => {
-    // THE regression this rule exists for: policy_get is a real policy frame with a writer plan
-    // (extension->host, no reader); classifying it inbound must fail the gate, not silently route host frames
-    // nothing validates.
-    const problems = classifierCoverageProblems(
+  // Each row: the group, its classified set with one mutation, and the exact problems the gate names for it.
+  const cases: readonly [string, Group, ReadonlySet<string>, string[]][] = [
+    [
+      // THE regression this rule exists for: policy_get is a real policy frame with a writer plan
+      // (extension->host, no reader); classifying it inbound must fail the gate, not silently route host frames
+      // nothing validates.
+      "a writer-only tag added to a classification array",
       "policy",
       new Set([...CLASSIFIED_TAGS.policy, "policy_get"]),
-    );
-    expect(problems).toHaveLength(1);
-    expect(problems[0]).toContain("policy_get");
-    expect(problems[0]).toContain("no reader or bare tag covers it");
-  });
-
-  test("a classified tag that is not a planned frame at all is refused", () => {
-    const problems = classifierCoverageProblems(
+      [
+        "classifier: policy tag policy_get is classified inbound but no reader or bare tag covers it - a frame " +
+          "wearing it would route unvalidated",
+      ],
+    ],
+    [
+      "a classified tag that is not a planned frame at all",
       "policy",
       new Set([...CLASSIFIED_TAGS.policy, "policy_nonexistent"]),
-    );
-    expect(problems.join("\n")).toContain(
-      "policy_nonexistent is not a planned frame of the Rust policy enum",
-    );
-  });
-
-  test("a gated inbound frame dropped from its classification array is refused", () => {
-    const classified = new Set([...CLASSIFIED_TAGS.policy].filter((t) => t !== "lang_current"));
-    expect(classifierCoverageProblems("policy", classified)).toEqual([
-      "policy: inbound frame lang_current is gated but no runtime classifier routes it",
-    ]);
-  });
-
-  test("an outbound exception pin that stops being classified is refused", () => {
-    // The CLASSIFIED_OUTBOUND_TAGS pins bind both ways: the exception cannot outlive the classification it
-    // excuses.
-    const classified = new Set(
-      [...CLASSIFIED_TAGS.enclave].filter((t) => t !== "enclave_challenge"),
-    );
-    expect(classifierCoverageProblems("enclave", classified)).toEqual([
-      "classifier: pinned outbound tag enclave_challenge is no longer classified by the enclave arrays",
-    ]);
+      [
+        "classifier: policy_nonexistent is not a planned frame of the Rust policy enum",
+        "classifier: policy tag policy_nonexistent is classified inbound but no reader or bare tag covers it - " +
+          "a frame wearing it would route unvalidated",
+      ],
+    ],
+    [
+      "a gated inbound frame dropped from its classification array",
+      "policy",
+      new Set([...CLASSIFIED_TAGS.policy].filter((t) => t !== "lang_current")),
+      ["policy: inbound frame lang_current is gated but no runtime classifier routes it"],
+    ],
+    [
+      // The CLASSIFIED_OUTBOUND_TAGS pins bind both ways: the exception cannot outlive the classification it
+      // excuses.
+      "an outbound exception pin that stops being classified",
+      "enclave",
+      new Set([...CLASSIFIED_TAGS.enclave].filter((t) => t !== "enclave_challenge")),
+      [
+        "classifier: pinned outbound tag enclave_challenge is no longer classified by the enclave arrays",
+      ],
+    ],
+  ];
+  test.each(cases)("%s is refused with the exact problems", (_, group, classified, problems) => {
+    expect(classifierCoverageProblems(group, classified)).toEqual(problems);
   });
 });
 
