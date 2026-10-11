@@ -17,6 +17,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { parseArgs } from "node:util";
 import { setOutput } from "@actions/core";
 import { DockerfileParser, Property } from "dockerfile-ast";
 import { TextDocument } from "vscode-languageserver-textdocument";
@@ -130,20 +131,37 @@ export function readAllPins(root = repoRoot): Map<string, string> {
   return new Map([...tools].sort().map((tool) => [tool, resolve(tool, prototools, args)]));
 }
 
+/** The CLI's arguments, or undefined for a shape the usage line does not allow. */
+function parseCli(
+  argv: string[],
+): { tool: string | undefined; output: string | undefined; all: boolean } | undefined {
+  try {
+    const { values, positionals } = parseArgs({
+      args: argv,
+      options: { output: { type: "string" }, all: { type: "boolean" } },
+      allowPositionals: true,
+    });
+    if (positionals.length > 1 || positionals[0] === "") return undefined;
+    return { tool: positionals[0], output: values.output, all: values.all === true };
+  } catch {
+    return undefined;
+  }
+}
+
 if (import.meta.main) {
   const usage = "usage: bun scripts/pin.ts <tool> [--output <name>] | --all";
-  const [tool, flag, outputName, ...extra] = process.argv.slice(2);
-  const outputForm = flag === "--output" && outputName !== undefined && extra.length === 0;
-  if (!tool || (flag !== undefined && !outputForm) || (tool === "--all" && flag !== undefined)) {
+  const cli = parseCli(process.argv.slice(2));
+  const allForm = cli?.all === true && cli.tool === undefined && cli.output === undefined;
+  if (cli === undefined || (!allForm && (cli.tool === undefined || cli.all))) {
     console.error(usage);
     process.exit(2);
   }
   try {
-    if (tool === "--all") {
+    if (allForm) {
       for (const [name, version] of readAllPins()) console.log(`${name} ${version}`);
     } else {
-      const pin = readPin(tool);
-      if (outputForm) setOutput(outputName, pin);
+      const pin = readPin(cli.tool as string);
+      if (cli.output !== undefined) setOutput(cli.output, pin);
       console.log(pin);
     }
   } catch (error) {
