@@ -15,7 +15,7 @@
 | `genkan doctor --paths` | read-only diagnostics | Prints the runtime dir and lock path this environment resolves to, creating neither. |
 | `genkan doctor --fix` | repair / install | Registers (or re-registers) this binary as the native-messaging host for your account. The only mutating form of doctor. |
 | `genkan doctor --fix --system` | repair / install (root) | The same, machine-wide: into the root-owned directories every account's browser reads. What the `.deb` runs after install. |
-| `genkan uninstall [--system]` | removal | Removes exactly the registrations this project wrote in that scope, nothing else. |
+| `genkan uninstall [--system \| (--manifest-dir <dir>)...]` | removal | Removes exactly the registrations this project wrote in that scope, nothing else. |
 | `genkan pair [--reset] [--file-store]` | enrollment | Mints the host key the extension pins, behind a confirmation typed on the terminal; the key lives in the OS credential store, or in a 0600 file with `--file-store`. |
 | `genkan revoke <browser>` | enrollment | Forgets that browser's enrolled authenticators; no proof needed, the browser enrolls again from its options page. |
 | `genkan revoke --all` | enrollment | Starts over: deletes the host key and the signed policy baseline, forgets every browser and every trusted client. A bare `revoke` is refused with the usage. |
@@ -33,6 +33,7 @@
 | `genkan audit [--limit <n>]` | read-only audit | Prints the on-disk audit trail, oldest first (default: the last 200 records). |
 | `genkan lang [show \| set <value>]` | display language | Reads or sets the display language the options page shows; `lang` alone is `show`. |
 | `genkan --help` | help | Usage information. |
+| `genkan --version` | version | The binary's version. |
 
 The options page offers the same actions. Terminal-only by design: `uninstall` (below), and the `--system` and `--manifest-dir` repair forms. The page's audit view widens with Show older up to the frame's cap; the whole trail is `audit --limit <n>`. The site allowlist, allow-all, and tab grouping stay on the page. They are browser-local extension storage (see the [privacy policy](./privacy-policy.md)), which no subcommand reads or writes.
 
@@ -44,9 +45,9 @@ It reports:
 
 - **Version / platform**: the binary version (Cargo is the source) and the running platform.
 - **Lock file**: whether the bridge lock file exists in the runtime directory, and the endpoint and pid recorded in it.
-- **Server reachability**: a passive connect-and-drop probe against our own bridge socket (no bytes sent), reporting `reachable` / `not reachable`.
+- **Server reachability**: a passive connect-and-drop probe against our own bridge socket (no bytes sent), reporting `reachable` / `not reachable`, or `not probed` when there is no runtime dir, no lock file, or an unreadable one.
 - **Kill switch**: engaged, clear, or unreadable. `doctor` exits non-zero while the switch is engaged or its state cannot be read.
-- **Native-host registrations**: for each known browser (chrome, chromium, brave, edge, vivaldi, opera), whether it looks present on this machine and the state of its registration for `com.vivswan.genkan.host` in each scope, `user` and `system`: `ok`, `missing`, `stale` (ours, but its launch path dangles), or not ours.
+- **Native-host registrations**: for each known browser (chrome, chromium, brave, edge, vivaldi, opera), whether it looks present on this machine and the state of its registration for `com.vivswan.genkan.host` in each scope, `user` and `system`: `ok`, `missing`, `stale` (ours, but its launch path or manifest dangles), `unreadable`, or not ours.
 - **The verdict follows the browser's lookup order**: the per-user entry when one exists, the system one only in its absence. The diagnosis comes from the same resolver `--fix` repairs with, so what doctor reports is exactly what `--fix` produces.
 
 The options page's Host registration section shows the same rows (lock file, server, kill switch, policy baseline, the verdict), worded by the host, and its identity section shows where the host key lives, as `enclave-status` prints it.
@@ -141,7 +142,7 @@ The host-key ceremony gives the extension one host identity to pin:
 
 - `genkan pair` asks for a confirmation typed on the terminal (a piped stdin is refused before any prompt), mints a P-256 host key, keeps it in the OS credential store (the Keychain, the Credential Manager, or the Secret Service), and prints the key's SHA-256 fingerprint. Compare that fingerprint with the one the extension shows on its enrollment screen; a mismatch means something sits between them.
 - `genkan pair --file-store` keeps the key in a 0600 file in the runtime directory instead, for a machine with no usable credential store. The choice is explicit: a store failure is reported, never silently redirected to the file.
-- `genkan pair --reset` asks for the confirmation first, then removes the previous key (from whichever store holds it) and mints a fresh one; the extension must re-pin. Browser enrollments and client pairings stay.
+- `genkan pair --reset` asks for the confirmation first, then removes the previous key (from whichever store holds it) and mints a fresh one; the extension must re-pin, and the signed policy baseline is cleared with the key (one that cannot be read is left in place and logged). Browser enrollments and client pairings stay.
 - When the credential store does not answer, a `--file-store` reset proceeds with a warning that an entry the store may hold stays behind. Run `pair --reset` again once the store answers; `revoke --all` would also forget every browser and client.
 - `genkan enclave-status [--json]` reports the current state read-only: whether a key is present, which store holds it, and its fingerprint.
 
@@ -164,7 +165,7 @@ By default (unenrolled), any process that spawns the server is served, and every
 
 ```text
 genkan pair-client --name claude-code --this-parent
-genkan pair-client --name codex --hash <sha256-hex>
+genkan pair-client --name codex --hash <hex>
 genkan pair-client --name claude-desktop --signer <signer-id>
 genkan list-clients
 genkan revoke-client --name codex
@@ -212,7 +213,7 @@ genkan policy history [--json]           # read-only: superseded revisions
 genkan policy rollback --revision <n> [--entry <id>] [--json]
 ```
 
-**Field flags.** `set` and `restrict` share one flag per policy field, spelled as the kebab-case of its camelCase wire name: `--cdp-mode`, `--file-upload`, `--handle-dialog`, `--page-eval`, `--confirm-high-risk-click`, `--confirm-page-eval`, `--presence-confirm`, `--confirm-tab-close`, `--warn-precise-snapshot`, `--eval-mask`, `--host-reverify-ms`, `--confirm-grace-ms`, `--click-toast-timeout-ms`, `--eval-toast-timeout-ms`, and `--disabled-tools`.
+**Field flags.** `set` and `restrict` share one flag per policy field, spelled as the kebab-case of its camelCase wire name with the `Enabled` suffix dropped: `--cdp-mode`, `--file-upload`, `--handle-dialog`, `--page-eval`, `--confirm-high-risk-click`, `--confirm-page-eval`, `--presence-confirm`, `--confirm-tab-close`, `--warn-precise-snapshot`, `--eval-mask`, `--host-reverify-ms`, `--confirm-grace-ms`, `--click-toast-timeout-ms`, `--eval-toast-timeout-ms`, and `--disabled-tools`.
 
 | Flag kind | Value |
 | --- | --- |
@@ -286,8 +287,8 @@ Read the durable trail with the read-only subcommand:
 ```text
 $ genkan audit --limit 20
 2026-07-17 19:04:11.201Z  kill_engage     surface=cli outcome=ok
-2026-07-17 19:04:12.480Z  tool_call       tool=tab_list outcome=error code=BRIDGE_KILLED dur_ms=0
-2026-07-17 19:05:02.913Z  kill_release    surface=cli outcome=ok
+2026-07-17 19:04:12.480Z  tool_call       req=3 tool=tab_list outcome=error code=BRIDGE_KILLED dur_ms=0
+2026-07-17 19:05:02.913Z  kill_release    surface=cli outcome=ok detail=auth=tty
 ```
 
 A record the reader cannot parse is shown as `UNRECOGNIZED RECORD` and counted, never guessed at; a `dropped=n` field marks records lost to a failed write (a full disk, for example). Recording never blocks or fails an operation: the trail observes decisions, it does not gate them.
