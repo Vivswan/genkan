@@ -62,6 +62,21 @@ impl RuntimeDir {
         Ok(dir)
     }
 
+    /// [`resolve`](Self::resolve), then the directory checked as ours when it exists, never created or
+    /// tightened: the readers' path, so `doctor`, `audit`, and a record load change nothing on disk and still
+    /// refuse a leaf another user planted (the check [`ensure`](Self::ensure) made by tightening it). `None`
+    /// is an absent directory: the reader answers "no file" and opens nothing beneath the path.
+    pub(crate) fn existing() -> io::Result<Option<RuntimeDir>> {
+        let dir = Self::resolve()?;
+        let present = crate::fsguard::check_private_dir(&dir.0).map_err(|e| {
+            io::Error::new(
+                e.kind(),
+                format!("runtime dir refused: {} {e}", dir.0.display()),
+            )
+        })?;
+        Ok(present.then_some(dir))
+    }
+
     pub(crate) fn as_path(&self) -> &Path {
         &self.0
     }

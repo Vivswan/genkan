@@ -211,7 +211,7 @@ impl Report {
 
     fn server_row(&self) -> DoctorRow {
         DoctorRow::new(match &self.lock {
-            Err(_) => "not probed (no runtime dir)",
+            Err(_) => "not probed (no usable runtime dir)",
             Ok(lock) => match &lock.state {
                 LockState::Present {
                     reachable: true, ..
@@ -319,25 +319,31 @@ pub(crate) fn gather_manifests() -> Result<Vec<ManifestStatus>, String> {
         .collect())
 }
 
-/// Gather the report by reading (never mutating) local state: the runtime dir is resolved, not created, so a
+/// Gather the report by reading (never mutating) local state: the runtime dir is checked, not created, so a
 /// machine with none reports it instead of gaining a directory from a diagnostic.
 pub fn gather() -> Report {
-    let lock = RuntimeDir::resolve()
-        .map(|dir| LockReport {
-            path: LockFile::path_in(&dir),
-            state: match LockFile::read() {
-                Ok(Some(lf)) => LockState::Present {
-                    reachable: crate::ipc::probe_endpoint(&lf.endpoint),
-                    secret_len: lf.secret.len(),
-                    pid: lf.pid,
-                    endpoint: lf.endpoint,
+    let lock = RuntimeDir::existing()
+        .and_then(|dir| match dir {
+            Some(dir) => Ok(LockReport {
+                path: LockFile::path_in(&dir),
+                state: match LockFile::read() {
+                    Ok(Some(lf)) => LockState::Present {
+                        reachable: crate::ipc::probe_endpoint(&lf.endpoint),
+                        secret_len: lf.secret.len(),
+                        pid: lf.pid,
+                        endpoint: lf.endpoint,
+                    },
+                    Ok(None) => LockState::Absent,
+                    // File exists but did not read/parse. Present-but-broken.
+                    Err(e) => LockState::Unreadable {
+                        detail: e.to_string(),
+                    },
                 },
-                Ok(None) => LockState::Absent,
-                // File exists but did not read/parse. Present-but-broken.
-                Err(e) => LockState::Unreadable {
-                    detail: e.to_string(),
-                },
-            },
+            }),
+            None => Ok(LockReport {
+                path: LockFile::path_in(&RuntimeDir::resolve()?),
+                state: LockState::Absent,
+            }),
         })
         .map_err(|e| e.to_string());
 
@@ -968,7 +974,7 @@ mod tests {
             "{text}"
         );
         assert!(
-            text.contains("mcp server:      not probed (no runtime dir)\n"),
+            text.contains("mcp server:      not probed (no usable runtime dir)\n"),
             "{text}"
         );
         assert!(

@@ -84,6 +84,42 @@ pub(crate) fn ensure_private_dir(dir: &Path) -> io::Result<()> {
     Ok(())
 }
 
+/// The read-side twin of [`ensure_private_dir`]: refuses the same shapes (a symlink leaf, a directory
+/// another user owns or that others can enter) without creating or tightening anything, so a reader never
+/// trusts a leaf it could not have secured. `Ok(false)` is an absent directory, which the reader treats as
+/// "no file" without opening anything beneath the path: a path under a shared parent can be filled in by
+/// another user between this check and a read.
+pub(crate) fn check_private_dir(dir: &Path) -> io::Result<bool> {
+    let meta = match fs::symlink_metadata(dir) {
+        Ok(meta) => meta,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(false),
+        Err(e) => return Err(e),
+    };
+    if meta.file_type().is_symlink() {
+        return Err(io::Error::other(
+            "is a symlink; refusing to read it as a private directory",
+        ));
+    }
+    if !meta.is_dir() {
+        return Err(io::Error::other("is not a directory"));
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::{MetadataExt, PermissionsExt};
+        if meta.uid() != crate::sys::effective_uid() {
+            return Err(io::Error::other(
+                "is owned by another user; refusing to read it as a private directory",
+            ));
+        }
+        if meta.permissions().mode() & 0o077 != 0 {
+            return Err(io::Error::other(
+                "is open to other users; refusing to read it as a private directory",
+            ));
+        }
+    }
+    Ok(true)
+}
+
 /// Read a small private file in full, bounded by `max` bytes. `Ok(None)` when the file does not exist;
 /// `InvalidData` when it exceeds the cap, after reading at most `max + 1` bytes. Every record in the runtime
 /// directory is a few KB at most, so anything larger is not ours (a same-user process planted it) and is
@@ -238,6 +274,52 @@ mod tests {
             std::os::unix::fs::symlink(&real, &link).unwrap();
             assert!(ensure_private_dir(&link).is_err());
         }
+    }
+
+    /// The readers' refusals mirror `ensure_private_dir`'s without touching the disk: `doctor` promises to
+    /// change nothing, and a reader must still refuse the leaf another user could have planted under a shared
+    /// runtime-dir parent.
+    #[cfg(unix)]
+    #[test]
+    fn check_private_dir_refuses_what_ensure_would_have_tightened_and_creates_nothing() {
+        use std::os::unix::fs::PermissionsExt;
+        let tmp = scratch();
+        let root = tmp.path();
+        let absent = root.join("absent");
+        let private = root.join("private");
+        let open = root.join("open");
+        let real = root.join("real");
+        let link = root.join("link");
+        let file = root.join("file");
+        for dir in [&private, &open, &real] {
+            fs::create_dir_all(dir).unwrap();
+        }
+        fs::set_permissions(&private, fs::Permissions::from_mode(0o700)).unwrap();
+        fs::set_permissions(&open, fs::Permissions::from_mode(0o755)).unwrap();
+        std::os::unix::fs::symlink(&real, &link).unwrap();
+        fs::write(&file, b"").unwrap();
+        let verdicts: Vec<(&str, Result<bool, ()>)> = [
+            ("absent", &absent),
+            ("private", &private),
+            ("open", &open),
+            ("link", &link),
+            ("file", &file),
+        ]
+        .into_iter()
+        .map(|(label, path)| (label, check_private_dir(path).map_err(|_| ())))
+        .collect();
+        assert_eq!(
+            verdicts,
+            [
+                ("absent", Ok(false)),
+                ("private", Ok(true)),
+                ("open", Err(())),
+                ("link", Err(())),
+                ("file", Err(()))
+            ]
+        );
+        assert!(!absent.exists(), "the check created {}", absent.display());
+        assert_eq!(mode_of(&open), 0o755, "the check tightened nothing");
     }
 
     #[test]

@@ -251,7 +251,8 @@ impl AuditRecord {
 }
 
 /// Path of the live audit file in the 0700 per-user runtime directory, created on the way: the appender's
-/// path. [`read`] resolves without creating, so `genkan audit` on a fresh machine mints no directory.
+/// path. [`read`] goes through [`ipc::RuntimeDir::existing`], which creates nothing, so `genkan audit` on a
+/// fresh machine mints no directory.
 pub fn audit_path() -> io::Result<PathBuf> {
     Ok(ipc::RuntimeDir::ensure()?.join("audit.log"))
 }
@@ -443,7 +444,14 @@ pub enum AuditEntry {
 /// Read the newest `limit` lines of the trail. Only an unreadable file is an
 /// error; a trail that does not exist yet is an empty page.
 pub fn read(limit: usize) -> io::Result<AuditPage> {
-    read_at(&ipc::RuntimeDir::resolve()?.join("audit.log"), limit)
+    match ipc::RuntimeDir::existing()? {
+        Some(dir) => read_at(&dir.join("audit.log"), limit),
+        None => Ok(AuditPage {
+            path: ipc::RuntimeDir::resolve()?.join("audit.log"),
+            entries: Vec::new(),
+            older: 0,
+        }),
+    }
 }
 
 fn read_at(live: &Path, limit: usize) -> io::Result<AuditPage> {
