@@ -23,11 +23,9 @@
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
-  accessSync,
   chmodSync,
   closeSync,
   existsSync,
-  constants as fsConstants,
   mkdirSync,
   openSync,
   readdirSync,
@@ -37,7 +35,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, delimiter, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 // fake-llm.ts and owned-dirs.ts are builtins-only like this file, and fake-llm's main() is guarded by
@@ -231,25 +229,18 @@ function failure(step: string, r: RunResult): ProbeOutcome {
 
 /**
  * Resolve a harness CLI to a real executable: GENKAN_HARNESS_<NAME>_BIN wins,
- * then the first PATH hit that is not a terminal-mux proxy (cmux drops a
+ * then the first PATH hit outside a terminal-mux proxy directory (cmux drops a
  * `claude` wrapper shim on PATH that breaks stdio MCP health checks), then
  * any PATH hit. Undefined means the harness is not installed.
  */
-function resolveCli(cli: string): string | undefined {
-  const override = process.env[`GENKAN_HARNESS_${cli.toUpperCase()}_BIN`];
+export function resolveCli(cli: string, env: NodeJS.ProcessEnv = process.env): string | undefined {
+  const override = env[`GENKAN_HARNESS_${cli.toUpperCase()}_BIN`];
   if (override) return override;
-  const candidates: string[] = [];
-  for (const dir of (process.env.PATH ?? "").split(":")) {
-    if (dir === "") continue;
-    const candidate = join(dir, cli);
-    try {
-      accessSync(candidate, fsConstants.X_OK);
-      candidates.push(candidate);
-    } catch {
-      // not here; keep walking PATH
-    }
-  }
-  return candidates.find((candidate) => !candidate.includes("cmux-cli-shims")) ?? candidates[0];
+  const PATH = env.PATH ?? "";
+  const unshimmed = PATH.split(delimiter)
+    .filter((dir) => !dir.includes("cmux-cli-shims"))
+    .join(delimiter);
+  return Bun.which(cli, { PATH: unshimmed }) ?? Bun.which(cli, { PATH }) ?? undefined;
 }
 
 // ---------------------------------------------------------------------------
