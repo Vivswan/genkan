@@ -13,6 +13,7 @@ use crate::enclave::{base64_decode, base64_encode, EnrollmentKey};
 use crate::ipc;
 use crate::presence::{PresenceAttestation, PresenceError, PresencePath};
 use crate::runtime_record::{Ladder, Record, RuntimeRecord};
+use crate::sys::now_unix;
 
 // ---- The on-disk store ------------------------------------------------------
 
@@ -181,13 +182,6 @@ fn evict_to_fit(history: &mut PolicyHistory) {
     while !history.entries.is_empty() && history.encode().is_err() {
         history.entries.remove(0);
     }
-}
-
-fn now_unix() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
 }
 
 // ---- The write seams: the signed grant and the free restriction --------------

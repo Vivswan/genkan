@@ -14,13 +14,13 @@
 //! ```
 
 use std::io;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
 use crate::cli::{AnchorSpec, PairClientArgs};
 use crate::ipc::{self, HashDigest, SignerId};
 use crate::presence::{self, PresenceAttestation};
+use crate::sys::now_unix;
 use crate::trust::{Clients, Scope, Trust, TrustState};
 
 /// The authorization key of an allowlist entry: the unforgeable thing a
@@ -168,13 +168,6 @@ pub(crate) fn audit_client_revoked(surface: crate::audit::Surface, name: &str) {
             .name(name)
             .outcome("ok"),
     );
-}
-
-fn now_unix() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
 }
 
 // ---- The presence-gated pairing API -----------------------------------------

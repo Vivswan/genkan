@@ -25,7 +25,7 @@ use crate::tools::BridgeCommand;
 
 /// Hard cap on a single native-messaging message sent *to* Chrome. Chrome
 /// closes the port if a message exceeds 1 MB. (Inbound from Chrome the limit
-/// is 64 MB, which we don't need to enforce.)
+/// is 64 MB, which `nm_read_frame` clamps to.)
 pub const NM_MAX_OUTGOING: usize = 1024 * 1024;
 
 /// Read one native-messaging frame from `r`: a 4-byte LE length prefix

@@ -2,10 +2,10 @@
 //! groups tools that share a Chrome permission and scope; its id and
 //! description are hand-authored here, the tools it covers are read off the
 //! tool catalogue (every bridge tool's record names exactly one capability,
-//! so coverage is by construction). On connect, the extension and host
-//! advertise which capability ids are actually available (permission
-//! granted, tool enabled) and the server negotiates against that list: a
-//! tool is callable only if its capability is advertised.
+//! so coverage is by construction). The intended use, not yet wired
+//! (docs/architecture.md, section 11.2): on connect the extension and host
+//! advertise which capability ids are available and the server negotiates
+//! against that list. Today nothing reads an advertised set.
 
 use super::catalogue::{all, Permission, Tool};
 
