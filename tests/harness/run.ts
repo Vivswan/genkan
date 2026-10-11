@@ -346,7 +346,7 @@ async function startFakeLlm(logPath: string): Promise<FakeLlm> {
       if (Date.now() > deadline) {
         throw new Error(`fake-llm did not announce its port within 15s; see ${logPath}`);
       }
-      await new Promise((resolveSleep) => setTimeout(resolveSleep, 50));
+      await Bun.sleep(50);
     }
     const port = Number(readFileSync(portfile, "utf8").trim());
     if (!Number.isInteger(port) || port <= 0) {
@@ -724,8 +724,7 @@ const HARNESSES: Harness[] = [
 function ensureBinary(): void {
   if (existsSync(BIN)) return;
   console.log("[harness-smoke] release binary missing, building...");
-  const brewCargo = "/opt/homebrew/bin/cargo";
-  const cargo = existsSync(brewCargo) ? brewCargo : "cargo";
+  const cargo = Bun.which("/opt/homebrew/bin/cargo") ?? "cargo";
   const env = { ...process.env, PATH: `/opt/homebrew/bin:${process.env.PATH ?? ""}` };
   const r = spawnSync(cargo, ["build", "--release", "--manifest-path", join(REPO, "Cargo.toml")], {
     env,
