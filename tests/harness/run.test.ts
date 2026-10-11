@@ -12,7 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { OWNER_FILE, ownedTempDir, removeOwnedDir, sweepStaleDirs } from "./owned-dirs";
-import { seedsDirOutsideRepo } from "./run";
+import { resolveCli, seedsDirOutsideRepo } from "./run";
 
 const REPO = resolve(import.meta.dir, "..", "..");
 const RUN = resolve(import.meta.dir, "run.ts");
@@ -202,3 +202,46 @@ test("SIGTERM stops and reaps the owned child, removes the owned dirs, then exit
     removeOwnedDir(root);
   }
 }, 20_000);
+
+// The resolver's named incident: cmux puts a `claude` wrapper shim on PATH that breaks stdio MCP health
+// checks, and a bare Bun.which returns it first.
+test("resolveCli skips a cmux shim when a real CLI is on PATH, and keeps it as the only hit", () => {
+  const root = mkdtempSync(join(tmpdir(), "harness-resolve-"));
+  try {
+    const shimDir = join(root, "cmux-cli-shims");
+    const realDir = join(root, "real-bin");
+    const emptyDir = join(root, "empty");
+    for (const dir of [shimDir, realDir, emptyDir]) mkdirSync(dir);
+    for (const file of [join(shimDir, "fakecli"), join(realDir, "fakecli")]) {
+      writeFileSync(file, "#!/bin/sh\n", { mode: 0o755 });
+    }
+    const cases: [label: string, env: NodeJS.ProcessEnv, expected: string | undefined][] = [
+      [
+        "shim then real: the real CLI wins",
+        { PATH: [shimDir, realDir].join(":") },
+        join(realDir, "fakecli"),
+      ],
+      [
+        "real then shim: the real CLI wins",
+        { PATH: [realDir, shimDir].join(":") },
+        join(realDir, "fakecli"),
+      ],
+      [
+        "shim only: the shim is the fallback",
+        { PATH: [emptyDir, shimDir].join(":") },
+        join(shimDir, "fakecli"),
+      ],
+      ["not installed", { PATH: emptyDir }, undefined],
+      ["empty PATH", { PATH: "" }, undefined],
+      [
+        "the override wins without touching PATH",
+        { PATH: [shimDir, realDir].join(":"), GENKAN_HARNESS_FAKECLI_BIN: "/opt/fakecli" },
+        "/opt/fakecli",
+      ],
+    ];
+    const results = cases.map(([label, env]) => [label, resolveCli("fakecli", env)]);
+    expect(results).toEqual(cases.map(([label, , expected]) => [label, expected]));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
