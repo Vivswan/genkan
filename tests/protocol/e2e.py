@@ -25,8 +25,9 @@ import time
 import unittest
 
 import harness as h
-from harness import (BridgeCase, McpClient, Served, nm_read, nm_read_raw, nm_read_type,
-                     nm_write, normalized, rpc_error, rpc_result, tool_error, tool_result)
+from harness import (MISSING_META, BridgeCase, McpClient, Served, forwarded, nm_read, nm_read_raw,
+                     nm_read_type, nm_write, normalized, rpc_error, rpc_result, tabs, tool_error,
+                     tool_result)
 
 
 def setUpModule():
@@ -45,31 +46,10 @@ DESCRIPTION_WARNINGS = [
     ("cookie_get", "httpOnly"),
     ("cookie_get", "masked"),
 ]
-MISSING_META = "request _meta is missing or has malformed required fields: "
 NOT_CONNECTED = "browser extension not connected - is the extension loaded and Chrome running?"
 
 
-def tabs(title, _id=7):
-    return [{"id": _id, "title": title, "url": "https://x", "active": True}]
-
-
-def forwarded(op, args=None, browser="default"):
-    """The BridgeReq envelope the server forwards to the host for one call
-    (its correlation id stripped by Served.request)."""
-    return {"op": op, "args": args or {}, "browser": browser}
-
-
-class E2ECase(BridgeCase):
-    def assertRoundTrip(self, c, nh, _id, title, args=None, modern=False):
-        """One legacy (or modern) tab_list call flows through `nh` and brings
-        its data back whole."""
-        served = Served(nh, tabs(title))
-        r = c.modern_call("tab_list", args or {}, _id=_id) if modern else c.call("tab_list", args or {}, _id=_id)
-        self.assertEqual(served.request(), forwarded("tab_list", args, browser=(args or {}).get("browser", "default")))
-        self.assertEqual(r, tool_result(_id, tabs(title), modern=modern))
-
-
-class ModernEra(E2ECase):
+class ModernEra(BridgeCase):
     def test_discover_and_the_tool_catalogue(self):
         """The discover result and the full catalogue (every name, description,
         and schema) are the contract a stateless client reads; a tool's risk
@@ -168,7 +148,7 @@ class ModernEra(E2ECase):
         self.assertEqual(c.modern_send("resources/list", _id=12), rpc_error(12, -32601, "resources/list"))
 
 
-class LegacyShim(E2ECase):
+class LegacyShim(BridgeCase):
     """Bare requests on an initialize-opened connection keep the pre-migration
     shapes byte-identical until that era is removed."""
 
@@ -200,7 +180,7 @@ class LegacyShim(E2ECase):
         self.assertToolsList(c.tools_list(_id=45), 45, {})
 
 
-class RoundTrips(E2ECase):
+class RoundTrips(BridgeCase):
     # (tool, arguments, the data the extension answers): one axis of the same flow.
     CASES = [
         ("tab_list", {}, tabs("E2E Tab")),
@@ -236,7 +216,7 @@ class RoundTrips(E2ECase):
             self.doCleanups()
 
 
-class ControlFrames(E2ECase):
+class ControlFrames(BridgeCase):
     INVALID_CHALLENGES = [
         ("NUL in the nonce", {"type": "enclave_challenge", "nonce": "bad\x00nonce"}),
         ("missing nonce", {"type": "enclave_challenge"}),
@@ -294,7 +274,7 @@ class ControlFrames(E2ECase):
         self.assertRoundTrip(c, nh, 92, "After Injected")
 
 
-class KillSwitch(E2ECase):
+class KillSwitch(BridgeCase):
     # The decisions the kill switch makes; attach and admit records interleave
     # and belong to other invariants.
     DECISIONS = ("tool_call", "kill_engage", "kill_release")
@@ -314,7 +294,7 @@ class KillSwitch(E2ECase):
         each step with its surface and the auth path."""
         self.skip_unless_unix("the pty-driven release")
         for name in ("trust.json", "audit.log", "audit.log.1", "audit.log.lock"):
-            self.addCleanup(self._remove, h.runtime_file(name))
+            self.addCleanup(h.remove_file, h.runtime_file(name))
         already = len(h.audit_records(self.DECISIONS))
         mcp = self.server()
         c = self.legacy_client(mcp)
@@ -381,13 +361,6 @@ class KillSwitch(E2ECase):
         self.assertEqual(shown.returncode, 0, shown.stderr)
         self.assertIn("kill_engage", shown.stdout)
         self.assertIn("kill_release", shown.stdout)
-
-    @staticmethod
-    def _remove(path):
-        try:
-            os.remove(path)
-        except FileNotFoundError:
-            pass
 
 
 class Isolation(unittest.TestCase):
@@ -483,7 +456,7 @@ time.sleep(60)
 """
 
 
-class Broker(E2ECase):
+class Broker(BridgeCase):
     def test_stale_lock_is_replaced(self):
         """A lock left by a dead pid must not block the next server."""
         os.makedirs(os.path.dirname(h.LOCK), exist_ok=True)
@@ -556,13 +529,7 @@ class Broker(E2ECase):
         relays, all alive, each able to drive the one attached browser."""
         h.remove_lock()
         servers = [self.instance() for _ in range(3)]
-        deadline = time.time() + 15
-        lf = None
-        while time.time() < deadline:
-            lf = h.wait_lock(timeout=1)
-            if lf is not None and all(s.poll() is None for s in servers):
-                break
-            time.sleep(0.2)
+        lf = h.wait_instances_settled(servers, 15)
         self.assertEqual([s.poll() for s in servers], [None] * 3, "all instances coexist")
         self.assertIn(h.lock_record(lf), [h.lock_published_by(s) for s in servers], "the lock names one instance")
         nh = self.host()
@@ -574,7 +541,7 @@ class Broker(E2ECase):
         self.assertIsNone(box["error"])
 
 
-class Browsers(E2ECase):
+class Browsers(BridgeCase):
     def test_two_labeled_browsers_route_independently(self):
         """Two labeled hosts authenticate independently, list_browsers counts
         both, explicit routing reaches each, an unaddressed call is refused
