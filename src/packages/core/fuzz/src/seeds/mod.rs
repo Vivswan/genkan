@@ -1,5 +1,5 @@
 //! The seed corpus, generated from the production types every time the fuzzer runs (`moon run
-//! fuzz-seeds`, the nightly job's first step) instead of committed: a committed corpus is a second copy
+//! fuzz-seeds`, the nightly job's first step over the fuzz workspace) instead of committed: a committed corpus is a second copy
 //! of the types, and it drifted (record seeds carrying a version the ladder never had, frames captured
 //! from a real client). Every happy-path seed goes through the real encoder (`bridge_write`,
 //! `nm_write_frame`, the record envelope's `encode`, the tool catalogue's own schemas), and every
@@ -106,7 +106,7 @@ pub fn corpus() -> Vec<Directory> {
 }
 
 /// The crate-relative path of the generated JSON token dictionary, the one `scripts/fuzz-smoke.ts`
-/// hands libFuzzer for every JSON-speaking target.
+/// hands libFuzzer for every byte-input target.
 pub const JSON_DICTIONARY: &str = "dictionaries/json_protocol.dict";
 
 /// What [`write_corpus`] put on disk, for the generator's summary lines.
