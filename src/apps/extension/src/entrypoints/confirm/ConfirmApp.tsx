@@ -45,7 +45,7 @@ const WARNING_KEY: Record<ConfirmKind, MessageKey> = {
 // union, so a catalogue rename breaks this map at compile time instead of
 // leaving the security chip showing a stale name. policy_relax is the one
 // kind that is not a tool call: its chip shows the wire frame name instead
-// (chipName below).
+// (the chip's ternary in the render below).
 const TOOL_NAME = {
   click: "page_click",
   press: "page_press",

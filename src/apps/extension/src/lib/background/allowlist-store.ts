@@ -55,8 +55,8 @@ export async function ensureAllowed(url: string | undefined) {
   if (!glob) throw new Error(`cannot parse url: ${url}`);
   // Global bypass: if the user opted into "allow all sites", skip the
   // per-site prompt entirely. The <all_urls> host permission must have been
-  // granted when they enabled the toggle (see options.ts), so content-script
-  // injection works on any origin.
+  // granted when they enabled the toggle (OptionsApp.tsx requests it inside
+  // the change handler), so content-script injection works on any origin.
   if ((await getSetting("allowAllSites")) === true) return;
   const list = await getAllowlist();
   if (matchesAny(glob, list)) return;
@@ -187,9 +187,9 @@ export async function resolvePendingAllow(
   return { ok: true };
 }
 
-// Manual add from the options page. We only persist the glob - MV3 forbids
-// browser.permissions.request outside a user-gesture context, so the actual
-// host permission is requested on first visit via ensureAllowed().
+// Manual add from the options page persists the glob only: this worker has no user gesture, which MV3
+// requires for browser.permissions.request, and ensureAllowed never asks for one either (a listed origin
+// returns at matchesAny). The popup's Allow is the one place a per-origin host permission is requested.
 export async function addAllow(input: string): Promise<RuntimeResponse<"add_allow">> {
   const glob = canonicalOriginGlob(input);
   if (!glob) return { ok: false, error: `not a valid http(s) origin: ${input}` };

@@ -90,7 +90,7 @@ export function buildChallengeMessage(nonce: string, context?: string): Uint8Arr
  * domain prefix is fixed and NUL-free, which already makes the three signing
  * domains mutually non-replayable, and the whole design is "sign the exact
  * bytes, verify the exact bytes". This deliberately does NOT reuse
- * buildDomainMessage: the policy message has one separator and one payload, not
+ * buildChallengeMessage: the policy message has one separator and one payload, not
  * the nonce/context pair. */
 export function buildPolicyMessage(docBytes: Uint8Array): Uint8Array {
   const domainB = utf8.encode(POLICY_DOMAIN);

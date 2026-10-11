@@ -7,6 +7,7 @@
 import { type OpArgs, TOOL_GRANTS } from "@genkan/shared/generated/ops";
 import type { PolicyValues } from "@genkan/shared/generated/policy";
 import type { ClickProbe } from "../../dom/page-api";
+import { originOf } from "../../shared/allowlist";
 import { inLife } from "../../shared/in-life";
 import type { PageOp } from "../../shared/page-ops";
 import type { PageBackend } from "../page-backend";
@@ -60,15 +61,6 @@ const lastConfirmed = inLife<{ key: string | null; until: number }>(() => ({
   key: null,
   until: 0,
 }));
-
-function originOf(url: string | undefined): string {
-  if (!url) return "";
-  try {
-    return new URL(url).origin;
-  } catch {
-    return url;
-  }
-}
 
 /** Reset the grace window (tests). */
 export function resetClickGraceWindow(): void {
