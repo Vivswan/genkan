@@ -90,6 +90,8 @@ pub trait Record: Serialize + DeserializeOwned + Sized {
 pub trait RuntimeRecord: Record {
     const VERSION: usize = Self::LADDER.current();
 
+    /// The writers' path: the runtime dir is created on the way. [`load`](Self::load) goes through
+    /// [`ipc::RuntimeDir::existing`], which creates nothing, so a read (`doctor` above all) changes nothing on disk.
     fn path() -> io::Result<PathBuf> {
         Ok(ipc::RuntimeDir::ensure()?.join(Self::FILE))
     }
@@ -97,7 +99,10 @@ pub trait RuntimeRecord: Record {
     /// Read the record. `Ok(None)` when the file does not exist. A present file that cannot be read is
     /// an error, never a silent `None`: treating a damaged record as absent would fail open.
     fn load() -> io::Result<Option<Self>> {
-        match fsguard::read_capped(&Self::path()?, Self::MAX_BYTES)? {
+        let Some(dir) = ipc::RuntimeDir::existing()? else {
+            return Ok(None);
+        };
+        match fsguard::read_capped(&dir.join(Self::FILE), Self::MAX_BYTES)? {
             Some(bytes) => Self::decode(&bytes).map(Some),
             None => Ok(None),
         }
