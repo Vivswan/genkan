@@ -16,6 +16,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isDeepStrictEqual } from "node:util";
 import {
   MANIFEST_PERMISSIONS,
   MINIMUM_CHROME_VERSION,
@@ -45,7 +46,7 @@ export function builtManifestProblems(root: string): string[] {
   if (built.key !== EXTENSION_MANIFEST_KEY) {
     problems.push("built manifest key differs from src/packages/core/src/identity.rs");
   }
-  if (JSON.stringify(built.permissions) !== JSON.stringify(MANIFEST_PERMISSIONS)) {
+  if (!isDeepStrictEqual(built.permissions, MANIFEST_PERMISSIONS)) {
     problems.push(`built permissions drifted: ${JSON.stringify(built.permissions)}`);
   }
   if (built.minimum_chrome_version !== MINIMUM_CHROME_VERSION) {

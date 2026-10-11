@@ -13,7 +13,6 @@
 // signing with a real Apple identity would break byte equality and move macOS verification to comparing cdhashes.
 
 import { spawnSync } from "node:child_process";
-import { accessSync, constants } from "node:fs";
 import { delimiter, dirname, join } from "node:path";
 import { die, repoRoot } from "./lib.ts";
 
@@ -29,17 +28,8 @@ function findCargo(): string {
     "/opt/homebrew/bin/cargo",
     join(home ?? "", ".cargo/bin/cargo"),
   ]) {
-    if (candidate.includes("/") || candidate.includes("\\")) {
-      try {
-        accessSync(candidate, constants.X_OK);
-        return candidate;
-      } catch {
-        // not there; try the next candidate
-      }
-    } else {
-      const found = Bun.which(candidate);
-      if (found) return found;
-    }
+    const found = Bun.which(candidate);
+    if (found) return found;
   }
   die("cargo not found. Install Rust (https://rustup.rs) or fix PATH.", 2);
 }
