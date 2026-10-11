@@ -146,6 +146,7 @@ settings:
   add_site_placeholder: "https://example.com/*"
   add_site_format: "Format should be https://host/*"
   add_site_parse_failed: "Could not parse the URL"
+  add_site_permission_declined: "The browser's permission for this site was declined; nothing was added."
 
 presence:
   surface_platform_authenticator: "Hardware tap: this device's authenticator (Touch ID, Windows Hello) signs each approval."

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useI18n } from "@/hooks/useI18n";
 import type { MessageKey } from "@/lib/i18n";
 import { send } from "@/lib/messages";
+import { globToPermissionPattern } from "@/lib/shared/allowlist";
 import { readKey } from "@/lib/shared/read-key";
 
 interface Pending {
@@ -161,7 +162,7 @@ export function PopupApp() {
   const resolvePending = async (allow: boolean) => {
     if (!pending) return;
     if (allow) {
-      const pattern = pending.glob.endsWith("/*") ? pending.glob : `${pending.glob}*`;
+      const pattern = globToPermissionPattern(pending.glob) ?? pending.glob;
       const granted = await browser.permissions.request({ origins: [pattern] }).catch(() => false);
       if (!granted) {
         await send({ type: "resolve_allow", id: pending.id, allow: false });

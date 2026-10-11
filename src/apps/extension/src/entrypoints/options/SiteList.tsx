@@ -3,7 +3,7 @@ import { browser } from "wxt/browser";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/hooks/useI18n";
 import { send } from "@/lib/messages";
-import { originGlobOf } from "@/lib/shared/allowlist";
+import { globToPermissionPattern, originGlobOf } from "@/lib/shared/allowlist";
 
 // The per-site allowlist editor: the row list of the options page's hero
 // card (OptionsApp owns the card chrome). Event-driven: refreshes on
@@ -39,6 +39,16 @@ export function SiteList() {
     const glob = originGlobOf(v);
     if (glob === null) {
       setNote(t("settings.add_site_parse_failed"));
+      return;
+    }
+    // The host permission is requested here, inside the click or Enter (a user gesture, which MV3 requires
+    // for permissions.request and which the service worker never has); a declined prompt persists nothing.
+    const pattern = globToPermissionPattern(glob);
+    const granted =
+      pattern !== null &&
+      (await browser.permissions.request({ origins: [pattern] }).catch(() => false));
+    if (!granted) {
+      setNote(t("settings.add_site_permission_declined"));
       return;
     }
     const resp = await send({ type: "add_allow", glob });
