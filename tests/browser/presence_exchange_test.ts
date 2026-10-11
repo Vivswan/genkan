@@ -57,7 +57,6 @@ function check(cond: boolean, label: string, detail?: unknown): void {
     console.log(`  FAIL  ${label}${detail !== undefined ? ` :: ${JSON.stringify(detail)}` : ""}`);
   }
 }
-const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 /** Our extension's service worker, by its distinctive `nativeMessaging` permission. */
 async function waitForExtension(browser: Browser): Promise<void> {
@@ -70,7 +69,7 @@ async function waitForExtension(browser: Browser): Promise<void> {
         .catch(() => [])) as string[];
       if (perms.includes("nativeMessaging")) return;
     }
-    await sleep(500);
+    await Bun.sleep(500);
   }
   throw new Error("extension service worker not found");
 }
@@ -258,7 +257,7 @@ async function waitForAuditRecord(
   for (let i = 0; i < 100; i++) {
     const hit = auditRecords(work).find(matches);
     if (hit) return hit;
-    await sleep(100);
+    await Bun.sleep(100);
   }
   return undefined;
 }
@@ -450,7 +449,7 @@ async function pendingRequest(page: Page): Promise<PresenceRequest | null> {
   for (let i = 0; i < 20; i++) {
     const reply = await send(page, { type: "webauthn_presence_pending" });
     if (reply.ok && reply.request) return reply.request as PresenceRequest;
-    await sleep(100);
+    await Bun.sleep(100);
   }
   return null;
 }

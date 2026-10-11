@@ -42,7 +42,6 @@ function check(cond: boolean, label: string, detail?: unknown): void {
     console.log(`  FAIL  ${label}${detail !== undefined ? ` :: ${JSON.stringify(detail)}` : ""}`);
   }
 }
-const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 /** Our extension's id, found by its distinctive `nativeMessaging` permission (Chrome for Testing ships
  * component extensions whose service workers also match a naive type filter). */
@@ -58,7 +57,7 @@ async function findExtensionId(browser: Browser): Promise<string> {
         return (await w.evaluate(() => chrome.runtime.id)) as string;
       }
     }
-    await sleep(500);
+    await Bun.sleep(500);
   }
   throw new Error("extension service worker not found");
 }

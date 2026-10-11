@@ -51,7 +51,6 @@ function check(cond: boolean, label: string): void {
     console.log(`  FAIL  ${label}`);
   }
 }
-const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 async function main(): Promise<void> {
   assertIsolatedBrowserOrSkip();
@@ -114,7 +113,7 @@ async function main(): Promise<void> {
           break;
         }
       }
-      if (!sw) await sleep(500);
+      if (!sw) await Bun.sleep(500);
     }
     check(!!sw, "extension service worker target exists");
     if (!sw) {

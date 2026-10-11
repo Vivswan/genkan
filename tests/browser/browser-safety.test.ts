@@ -14,6 +14,7 @@ import {
   ranMarkerBody,
   runtimeDirIsolated,
   suiteExitCode,
+  writeHostWrapper,
   writeRanMarker,
 } from "./browser-safety";
 
@@ -267,4 +268,46 @@ describe("assertHostIsolated", () => {
     const bin = stubBinary(name.replaceAll(" ", "-"), report);
     expect(() => assertHostIsolated(bin, {}, work)).toThrow(reason);
   });
+});
+
+// /bin/sh is the one reader of the wrapper, and only it decides what a quote, a `$`, or a space inside a value
+// does; the test pins that every value and argument reaches the host byte for byte (the unquoted writer split
+// an argument on its space and let the shell expand a value's quotes and `$`).
+test("writeHostWrapper quotes every value and argument for /bin/sh", () => {
+  if (process.platform === "win32") return;
+  const dir = mkdtempSync(join(tmpdir(), "genkan-wrapper-"));
+  try {
+    const awkward = `it's "quoted" $HOME \`x\` back\\slash`;
+    const env = {
+      XDG_RUNTIME_DIR: join(dir, "run time"),
+      XDG_CONFIG_HOME: join(dir, "config"),
+      HOME: join(dir, "home"),
+      LOCALAPPDATA: awkward,
+      GENKAN_LOG: "info",
+      GENKAN_LOG_FORMAT: "text",
+    } satisfies Record<string, string>;
+    // The "host" is sh itself, printing each argument on its own line and then the six variables.
+    const probe =
+      'printf "%s\\n" "$@"; for n in XDG_RUNTIME_DIR XDG_CONFIG_HOME HOME LOCALAPPDATA GENKAN_LOG GENKAN_LOG_FORMAT; do eval "printf \\"%s\\\\n\\" \\"\\$$n\\""; done';
+    const wrapper = writeHostWrapper(
+      dir,
+      "/bin/sh",
+      ["-c", probe, "sh", "two words", awkward],
+      env,
+    );
+    const lines = execFileSync(wrapper, { encoding: "utf8" }).split("\n");
+    expect(lines).toEqual([
+      "two words",
+      awkward,
+      env.XDG_RUNTIME_DIR,
+      env.XDG_CONFIG_HOME,
+      env.HOME,
+      awkward,
+      "info",
+      "text",
+      "",
+    ]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

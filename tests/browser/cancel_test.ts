@@ -42,7 +42,6 @@ function check(cond: boolean, label: string, detail?: unknown): void {
     console.log(`  FAIL  ${label}`, detail === undefined ? "" : JSON.stringify(detail));
   }
 }
-const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 /** The frames the fake host has logged so far, oldest first. */
 function logged(logFile: string): Record<string, unknown>[] {
@@ -123,7 +122,7 @@ async function main(): Promise<void> {
     // land in the log. The answer to 42 is the end of the exchange: wait for it, bounded.
     const deadline = Date.now() + 30000;
     while (Date.now() < deadline && !logged(logFile).some((f) => f.id === 42)) {
-      await sleep(250);
+      await Bun.sleep(250);
     }
     const frames = logged(logFile);
     const answer42 = frames.find((f) => f.id === 42);

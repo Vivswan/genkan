@@ -113,7 +113,7 @@ class Chrome {
         });
         if (r.ok) return;
       } catch {}
-      await new Promise((r) => setTimeout(r, 200));
+      await Bun.sleep(200);
     }
     throw new Error(`Chrome did not become ready on port ${this.port}`);
   }
@@ -360,7 +360,7 @@ async function callListener(page: Page, msgExpr: string, timeoutMs = 8000): Prom
   while (Date.now() < deadline) {
     const resp = await page.evaluate("window.__bbLastResp");
     if (resp !== undefined && resp !== null) return resp;
-    await new Promise((r) => setTimeout(r, 50));
+    await Bun.sleep(50);
   }
   throw new Error(`callListener timed out after ${timeoutMs}ms`);
 }
@@ -811,7 +811,7 @@ async function testIframe(page: Page): Promise<void> {
   for (let i = 0; i < 20; i++) {
     const ready = await page.evaluate("window.__iframeReady === true");
     if (ready) break;
-    await new Promise((r) => setTimeout(r, 100));
+    await Bun.sleep(100);
   }
   const iframeReady = await page.evaluate("window.__iframeReady === true");
   check(iframeReady, "iframe finished loading");

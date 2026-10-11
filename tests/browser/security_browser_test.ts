@@ -47,7 +47,6 @@ function check(cond: boolean, label: string, detail?: unknown): void {
     console.log(`  FAIL  ${label}${detail !== undefined ? ` :: ${JSON.stringify(detail)}` : ""}`);
   }
 }
-const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 type Worker = NonNullable<Awaited<ReturnType<Target["worker"]>>>;
 interface Sw {
@@ -71,7 +70,7 @@ async function findSw(browser: Browser, has: (perms: string[]) => boolean): Prom
         return { worker: w, id };
       }
     }
-    await sleep(400);
+    await Bun.sleep(400);
   }
   throw new Error("service worker not found");
 }
@@ -95,7 +94,7 @@ async function findSwBy(browser: Browser, match: (w: Worker) => Promise<boolean>
         return { worker: w, id };
       }
     }
-    await sleep(400);
+    await Bun.sleep(400);
   }
   throw new Error("service worker not found");
 }
@@ -209,7 +208,7 @@ async function main(): Promise<void> {
     const helper = await findSwByName(browser, "Access-level probe (test fixture)");
     const webPage = await browser.newPage();
     await webPage.goto(WEB_URL, { waitUntil: "domcontentloaded", timeout: 20000 }).catch(() => {});
-    await sleep(500);
+    await Bun.sleep(500);
     const webTabId = (await helper.worker.evaluate(async (url) => {
       const t = (await chrome.tabs.query({})).find((x) => x.url === url);
       return t?.id;
@@ -295,7 +294,7 @@ async function main(): Promise<void> {
     const optUrl = `chrome-extension://${ours.id}/options.html`;
     const optPage = await browser.newPage();
     await optPage.goto(optUrl, { waitUntil: "load", timeout: 15000 });
-    await sleep(1200);
+    await Bun.sleep(1200);
 
     // Proof 4 (off-DOM confirm, sender gate): confirm_* from a non-confirm
     // extension page is refused - including the deny-and-kill panic exit,
@@ -328,7 +327,7 @@ async function main(): Promise<void> {
         await chrome.storage.local.set({ uiLanguage: l });
       }, locale);
       await optPage.reload({ waitUntil: "load" });
-      await sleep(1000);
+      await Bun.sleep(1000);
       const rendered = (await optPage.evaluate(() => ({
         h1: document.querySelector("h1")?.textContent?.trim(),
         lang: document.documentElement.lang,

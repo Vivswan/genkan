@@ -78,7 +78,6 @@ const assertFreshTempProfile = (cfg: DevBrowserConfig & Record<string, unknown>)
 let shuttingDown = false;
 // The lane starts with dev.ts, before WXT's first serve-mode build.
 const startedAt = Date.now();
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Nothing is spawned until WXT's build is fresh AND settled, so waiting costs only time.
 //   manifest mtime >= this lane's start    -> fresh: a chrome-mv3-dev/ from a previous session is ignored (WXT wipes it)
@@ -97,7 +96,7 @@ const waitForSettledBuild = async (deadline: number): Promise<boolean> => {
       // missing, stale, or mid-write (WXT rebuild in progress) - keep waiting
     }
     if (Date.now() > deadline) return false;
-    await sleep(250);
+    await Bun.sleep(250);
   }
   return false;
 };
@@ -158,7 +157,7 @@ class CapturingRunner {
   // direct kill by the recorded pid follows.
   close(): Promise<void> {
     this.#closePromise ??= (async () => {
-      await Promise.race([this.#exit().catch(() => {}), sleep(8_000)]);
+      await Promise.race([this.#exit().catch(() => {}), Bun.sleep(8_000)]);
       // Direct kill by the pid chrome-launcher recorded, WITHOUT awaiting
       // web-ext's setup. A no-op if the instance is not up yet or web-ext
       // renamed the field, in which case the exit() above is the closer.
@@ -240,7 +239,7 @@ const shutdown = async (): Promise<void> => {
   // CapturingRunner constructor sets activeBrowser), bounded so a hung cmd.run
   // cannot stall teardown - the constructor runs early, so the handle is
   // published well before any hang.
-  await Promise.race([launchInFlight ?? Promise.resolve(), sleep(5_000)]).catch(() => {});
+  await Promise.race([launchInFlight ?? Promise.resolve(), Bun.sleep(5_000)]).catch(() => {});
   // Close the browser (live or mid-launch) by the pid web-ext-run recorded -
   // never a pattern match. close() is memoized, so if the launch path is
   // already closing it, this awaits that same close before we exit.

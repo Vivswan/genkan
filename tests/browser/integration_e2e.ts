@@ -85,7 +85,6 @@ function check(cond: boolean, label: string, detail?: unknown): void {
     console.log(`  FAIL  ${label}${detail !== undefined ? ` :: ${JSON.stringify(detail)}` : ""}`);
   }
 }
-const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 /** Chrome derives an extension id from its public key when pinned, or from the
  * unpacked extension's absolute path otherwise. */
@@ -273,7 +272,7 @@ async function main(): Promise<void> {
   try {
     for (let i = 0; i < 100; i++) {
       if (fs.existsSync(LOCK)) break;
-      await sleep(50);
+      await Bun.sleep(50);
     }
     check(fs.existsSync(LOCK), "MCP server wrote the lock file");
 
@@ -327,7 +326,7 @@ async function main(): Promise<void> {
     children.push(browser.process());
     const page = await browser.newPage();
     await page.goto(FIXTURE).catch(() => {});
-    await sleep(1000);
+    await Bun.sleep(1000);
 
     const expectedWorkerUrl = `chrome-extension://${extId}/background.js`;
     const extensionLoaded = browser.targets().some((target) => target.url() === expectedWorkerUrl);
@@ -382,10 +381,10 @@ async function main(): Promise<void> {
     let connected = false;
     for (let i = 0; i < 300 && !connected; i++) {
       if (live.size === 0) {
-        await sleep(100);
+        await Bun.sleep(100);
         continue;
       }
-      await sleep(1500);
+      await Bun.sleep(1500);
       connected = live.size > 0;
     }
     check(
@@ -422,7 +421,7 @@ async function main(): Promise<void> {
       r = await recv();
       const transient = /NOT_CONNECTED|CONNECTION_LOST/.test(errorText(r) ?? "");
       if (r.id !== id || !transient) break;
-      await sleep(250);
+      await Bun.sleep(250);
     }
     // The profile holds no pinned host key, so the only correct answer is the enrollment gate's refusal,
     // as the JSON-RPC reply to THIS request: a served tab_list would mean the gate is gone, and an
@@ -447,10 +446,10 @@ async function main(): Promise<void> {
     // The server is gone before the exit hook removes its runtime dir, or its shutdown writes recreate it;
     // a server that will not die keeps its dir (a warning, never a delete under a live process).
     mcp.kill();
-    for (let i = 0; i < 50 && !exited; i++) await sleep(100);
+    for (let i = 0; i < 50 && !exited; i++) await Bun.sleep(100);
     if (!exited) {
       mcp.kill("SIGKILL");
-      for (let i = 0; i < 50 && !exited; i++) await sleep(100);
+      for (let i = 0; i < 50 && !exited; i++) await Bun.sleep(100);
     }
     if (!exited) {
       console.warn(`[e2e] the MCP server did not exit; leaving ${work} and ${profile} in place`);
