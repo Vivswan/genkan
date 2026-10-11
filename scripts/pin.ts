@@ -135,6 +135,10 @@ export function readAllPins(root = repoRoot): Map<string, string> {
 function parseCli(
   argv: string[],
 ): { tool: string | undefined; output: string | undefined; all: boolean } | undefined {
+  // parseArgs keeps the last of a repeated flag; the usage line allows each once.
+  const repeated = (flag: string): boolean =>
+    argv.filter((arg) => arg === flag || arg.startsWith(`${flag}=`)).length > 1;
+  if (repeated("--output") || repeated("--all")) return undefined;
   try {
     const { values, positionals } = parseArgs({
       args: argv,
