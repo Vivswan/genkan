@@ -26,6 +26,7 @@ import binascii
 import hashlib
 import json
 import os
+import pathlib
 import re
 import shutil
 import signal
@@ -306,12 +307,26 @@ def ensure_binary():
                            os.path.join(REPO, "Cargo.toml")])
 
 
+def remove_file(path):
+    pathlib.Path(path).unlink(missing_ok=True)
+
+
 def remove_lock(env=None):
     require_isolated(env)
-    try:
-        os.remove(LOCK)
-    except FileNotFoundError:
-        pass
+    remove_file(LOCK)
+
+
+def wait_instances_settled(servers, timeout):
+    """The lock once it exists with every instance in `servers` still alive, or the last reading
+    after `timeout` seconds (the caller asserts both)."""
+    deadline = time.time() + timeout
+    lf = None
+    while time.time() < deadline:
+        lf = wait_lock(timeout=1)
+        if lf is not None and all(s.poll() is None for s in servers):
+            break
+        time.sleep(0.2)
+    return lf
 
 
 def wait_lock(proc=None, timeout=8):
@@ -542,10 +557,14 @@ class McpClient:
         return self.modern_send("tools/call", {"name": name, "arguments": args},
                                 _id=_id, version=version)
 
-    def initialize(self, version=LEGACY_VERSION, _id=1):
+    def send_initialize(self, version=LEGACY_VERSION, _id=1):
+        """The legacy opener, sent without reading the reply (a suite that reads past other frames first)."""
         self.send({"jsonrpc": "2.0", "id": _id, "method": "initialize",
                    "params": {"protocolVersion": version, "capabilities": {},
                               "clientInfo": {"name": "e2e", "version": "0.1"}}})
+
+    def initialize(self, version=LEGACY_VERSION, _id=1):
+        self.send_initialize(version, _id)
         return self.recv()
 
     def initialized(self):
@@ -559,9 +578,14 @@ class McpClient:
         self.send({"jsonrpc": "2.0", "id": _id, "method": "tools/list"})
         return self.recv()
 
-    def call(self, name, args, _id=3):
+    def send_call(self, name, args, _id=3):
+        """A bare tools/call, sent without reading the reply (a suite that expects EOF or holds the
+        request in flight at the host)."""
         self.send({"jsonrpc": "2.0", "id": _id, "method": "tools/call",
                    "params": {"name": name, "arguments": args}})
+
+    def call(self, name, args, _id=3):
+        self.send_call(name, args, _id)
         return self.recv()
 
 
@@ -776,6 +800,23 @@ def serve_bridge_req(nh, responder):
         return None
     nm_write(nh, responder(req))
     return req
+
+
+MISSING_META = "request _meta is missing or has malformed required fields: "
+MISSING_BOTH = MISSING_META + f"{META_VERSION_KEY}, {META_CAPS_KEY}"
+
+
+def tabs(title, _id=7):
+    return [{"id": _id, "title": title, "url": "https://x", "active": True}]
+
+
+def forwarded(op, args=None, browser="default"):
+    """The BridgeReq envelope the server forwards to the host for one call
+    (its correlation id stripped by Served.request)."""
+    return {"op": op, "args": args or {}, "browser": browser}
+
+
+FORWARDED_TAB_LIST = forwarded("tab_list")
 
 
 def without_id(frame):
@@ -1017,10 +1058,7 @@ def reset_enrollment():
     clients, kill latch, epoch). Deleting it is the documented same-user
     revert to the open bootstrap, pinned live by A19."""
     require_isolated()
-    try:
-        os.remove(runtime_file("trust.json"))
-    except FileNotFoundError:
-        pass
+    remove_file(runtime_file("trust.json"))
 
 
 # audit.rs AUDIT_VERSION.
@@ -1157,6 +1195,16 @@ class BridgeCase(unittest.TestCase):
     def assertLock(self, lf, proc, msg=None):
         """`lf` is the whole lock the live server `proc` publishes."""
         self.assertEqual(lock_record(lf), lock_published_by(proc), msg)
+
+    def assertRoundTrip(self, c, nh, _id, title="Round Trip", args=None, modern=False, secs=None):
+        """One tab_list call (legacy, or modern) flows through the ready host `nh` and brings its
+        data back whole; `secs` bounds the call for a suite that may have wedged the server."""
+        served = Served(nh, tabs(title))
+        def call():
+            return (c.modern_call if modern else c.call)("tab_list", args or {}, _id=_id)
+        r = call() if secs is None else self.bounded(f"round-trip {title}", call, secs)
+        self.assertEqual(served.request(), forwarded("tab_list", args, browser=(args or {}).get("browser", "default")))
+        self.assertEqual(r, tool_result(_id, tabs(title), modern=modern))
 
     def assertEventually(self, read, expected, timeout, msg=None):
         """`read()` comes to equal `expected` within `timeout` seconds (a state

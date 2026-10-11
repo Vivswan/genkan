@@ -36,10 +36,11 @@ Attack matrix (LIVE = asserted here; REF = covered elsewhere, named):
   A23  junk _meta protocolVersion values         LIVE  -32022 strings, -32602 malformed
   A24  bare discover opener + hostile flood      LIVE  opener dropped; flood served
   A25  1 MB protocolVersion string               LIVE  -32022, echo not amplified
-  A4   replay a captured HMAC response           REF   unreachable past A1; ipc/handshake.rs
-                                                       verify_mac_* and handshake_round_trip_over_socketpair
+  A4   replay a captured HMAC response           REF   unreachable past A1; ipc/handshake.rs tests
+                                                       handshake_round_trip_over_a_loopback_pair and
+                                                       a_tampered_label_invalidates_the_mac
   A5   forged or garbage MAC                     REF   same drop; verify_mac is constant time
-  A6   hex-decoder abuse                         REF   ipc/handshake.rs hex_decode tests + hex_fuzz
+  A6   hex-decoder abuse                         REF   verify_mac's hex::decode; fuzz target handshake_verify
   A7   serde/parser abuse on arbitrary bytes     REF   protocol.rs proptests + the fuzz targets
   A10  cross-uid connect                         REF   needs a second uid; the 0700 runtime dir
                                                        and the peer-UID check in broker.rs admit()
@@ -58,8 +59,8 @@ import sys
 import unittest
 
 import harness as h
-from harness import (BridgeCase, McpClient, Served, nm_read, nm_write, normalized, pair_client,
-                     rpc_error, rpc_result, tool_error, tool_result)
+from harness import (MISSING_BOTH, MISSING_META, BridgeCase, McpClient, Served, nm_read, nm_write,
+                     normalized, pair_client, rpc_error, rpc_result, tool_error)
 
 
 def setUpModule():
@@ -71,10 +72,6 @@ def tearDownModule():
     h.teardown()
 
 
-TAB = [{"id": 7, "title": "Adversarial Tab", "url": "https://x", "active": True}]
-FORWARDED_TAB_LIST = {"op": "tab_list", "args": {}, "browser": "default"}
-MISSING_META = "request _meta is missing or has malformed required fields: "
-MISSING_BOTH = MISSING_META + f"{h.META_VERSION_KEY}, {h.META_CAPS_KEY}"
 ALLOWLIST_REFUSAL = "not in the trusted-client allowlist"
 
 
@@ -87,12 +84,6 @@ def copy_of_binary(name):
 
 
 class AdversarialCase(BridgeCase):
-    def assertRoundTrip(self, c, nh, _id):
-        served = Served(nh, TAB)
-        r = c.call("tab_list", {}, _id=_id)
-        self.assertEqual(served.request(), FORWARDED_TAB_LIST)
-        self.assertEqual(r, tool_result(_id, TAB))
-
     def enrolled_broker(self):
         return super().enrolled_broker(self.legacy_client)
 
@@ -164,9 +155,7 @@ class Floods(AdversarialCase):
         srv.stdin.write("x" * (64 * 1024 * 1024 + 2) + "\n")
         srv.stdin.flush()
         c = McpClient(srv)
-        c.send({"jsonrpc": "2.0", "id": 1, "method": "initialize",
-                "params": {"protocolVersion": h.LEGACY_VERSION, "capabilities": {},
-                           "clientInfo": {"name": "e2e", "version": "0.1"}}})
+        c.send_initialize(_id=1)
 
         def read_until_init():
             for _ in range(12):
@@ -245,7 +234,7 @@ class Surface(AdversarialCase):
         nh = None
         if os.name != "nt":
             nh = self.host(env=env)
-            served = Served(nh, TAB)
+            served = Served(nh, h.tabs("Adversarial Tab"))
             reply = json.dumps(c.call("tab_list", {}, _id=5))
             served.request()
         doc = h.run_cli(["doctor"], env=env)
@@ -303,8 +292,7 @@ class Revocation(AdversarialCase):
         h.run_cli(["revoke-client", "--name", "pytest"], check=True)
         self.assertEqual(h.read_trust(), h.trust_record(2, []),
                          "one write emptied the allowlist and moved the epoch")
-        c.send({"jsonrpc": "2.0", "id": 51, "method": "tools/call",
-                "params": {"name": "tab_list", "arguments": {}}})
+        c.send_call("tab_list", {}, _id=51)
         self.assertEqual(self.bounded("the revoked call", srv.stdout.readline, 10), "",
                          "the revoked harness gets EOF, not service")
         self.assertExits(srv, 5, "the broker for the revoked harness exits")
@@ -382,8 +370,7 @@ class KillSwitch(AdversarialCase):
         self.assertEqual(c.ping(_id=69), rpc_result(69, {}))
         with open(h.runtime_file("trust.json"), "w") as f:
             f.write("{ this is not json")
-        c.send({"jsonrpc": "2.0", "id": 70, "method": "tools/call",
-                "params": {"name": "tab_list", "arguments": {}}})
+        c.send_call("tab_list", {}, _id=70)
         self.assertEqual(self.bounded("the call on an unreadable record", srv.stdout.readline, 10), "",
                          "the live broker drops the harness")
         self.assertRefusedToStart(self.server(wait=False))
