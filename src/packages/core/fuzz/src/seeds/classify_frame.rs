@@ -2,9 +2,11 @@
 //! forwards, every host->browser frame it must flag as a stray, and malformed requests. The reader
 //! is the classifier itself: forwarded or handled is accepted, `Malformed` is the refusal.
 
+use genkan_core::allowlist::{Anchor, ClientName};
 use genkan_core::audit::{extension_kind_wire_names, AuditKind};
 use genkan_core::enclave::{base64_encode, REASON_CODES, SIG_LEN};
-use genkan_core::policy::PolicyDoc;
+use genkan_core::ipc::HashDigest;
+use genkan_core::policy::{PolicyDoc, PolicyOverlay};
 use genkan_core::protocol::control::{
     classify_nm_frame, AdminControl, EnclaveControl, EnrollOutcome, ExtensionAuditKind,
     FrameDisposition, HostRequest, KillStatus, PolicyControl, PolicyStatus, PresenceOutcome,
@@ -57,6 +59,43 @@ pub(super) fn directory() -> Directory {
         json_of!(HostRequest::PolicyGet {}),
         json_of!(HostRequest::LangGet {}),
         json_of!(HostRequest::LangSet { value: "en".into() }),
+        json_of!(HostRequest::ClientPair {
+            name: ClientName::try_from("example-client".to_string()).expect("a valid client name"),
+            anchor: Anchor::Hash(
+                HashDigest::try_from(&[0x11u8; 32][..]).expect("32 bytes is a digest width")
+            ),
+        }),
+        json_of!(HostRequest::DoctorReport {}),
+        json_of!(HostRequest::AuditRead { limit: None }),
+        json_of!(HostRequest::RegistrationStatus {}),
+        json_of!(HostRequest::RegistrationRepair { browsers: None }),
+        json_of!(HostRequest::PolicyRestrict {
+            overlay: PolicyOverlay::default()
+        }),
+        json_of!(HostRequest::PolicySet {
+            overlay: PolicyOverlay::default()
+        }),
+        json_of!(HostRequest::PolicyHistory {}),
+        json_of!(HostRequest::PolicyRollback {
+            revision: 1,
+            entry: None
+        }),
+        json_of!(HostRequest::EnrollBegin {}),
+        json_of!(HostRequest::EnrollFinish {
+            attestation_object: "example-attestation".into(),
+            client_data_json: "example-client-data".into(),
+        }),
+        json_of!(HostRequest::PresenceBegin {
+            action: "release the kill switch".into(),
+            origin: "chrome-extension://example".into(),
+        }),
+        json_of!(HostRequest::PresenceAssert {
+            credential_id: "example-credential".into(),
+            authenticator_data: "example-authdata".into(),
+            client_data_json: "example-client-data".into(),
+            signature: "example-signature".into(),
+        }),
+        json_of!(HostRequest::BrowserRevoke {}),
     ];
     let mut seeds: Vec<Seed> = requests
         .iter()
@@ -155,6 +194,48 @@ pub(super) fn directory() -> Directory {
         json_of!(PolicyControl::LangCurrent {
             value: "en".into(),
             seq: 1
+        }),
+        json_of!(AdminControl::ClientPairResult {
+            ok: false,
+            error: Some("example".into())
+        }),
+        json_of!(AdminControl::DoctorReportResult {
+            ok: false,
+            report: None,
+            error: Some("example".into()),
+        }),
+        json_of!(AdminControl::AuditReadResult {
+            ok: false,
+            entries: None,
+            older: None,
+            path: None,
+            error: Some("example".into()),
+        }),
+        json_of!(AdminControl::RegistrationStatusResult {
+            ok: false,
+            browsers: None,
+            error: Some("example".into()),
+        }),
+        json_of!(PolicyControl::PolicyRestrictResult {
+            ok: false,
+            error: Some("example".into())
+        }),
+        json_of!(PolicyControl::PolicySetResult {
+            ok: false,
+            error: Some("example".into())
+        }),
+        json_of!(PolicyControl::PolicyHistoryResult {
+            ok: false,
+            entries: None,
+            error: Some("example".into()),
+        }),
+        json_of!(PolicyControl::PolicyRollbackResult {
+            ok: false,
+            error: Some("example".into())
+        }),
+        json_of!(WebAuthnControl::BrowserRevokeResult {
+            ok: false,
+            reason: Some("example".into())
         }),
     ];
     seeds.extend(strays.iter().map(|frame| {
