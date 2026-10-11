@@ -1,4 +1,3 @@
-// tier: pr
 // The options page's host-admin exchanges, extension side: request/reply correlation over the native-messaging
 // port for the registration rows (status and repair share the host's one result tag), the policy restriction
 // lane, and the host audit trail, the fail-closed deadline, and the unsolicited-frame drops. The host side (the

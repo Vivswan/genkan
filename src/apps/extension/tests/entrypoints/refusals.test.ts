@@ -1,4 +1,3 @@
-// tier: pr
 // A refused frame's reason is "<code>" or "<code>: <detail>" (Reason in src/packages/core/src/webauthn/refusal.rs),
 // a cross-process shape this file cannot see: the detail lands in parentheses after the code's sentence, a
 // code from a host newer than this extension gets the unknown-code sentence instead of showing bare, and the

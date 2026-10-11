@@ -1,4 +1,3 @@
-// tier: pr
 /**
  * Security browser proofs of the off-DOM confirmation surface: the runtime verification the Vitest
  * + fakeBrowser suite cannot do, run against an ISOLATED Chrome for Testing. Native messaging is

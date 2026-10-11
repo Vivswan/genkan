@@ -1,4 +1,3 @@
-// tier: pr
 //! The pure planning both grant surfaces share: the rollback lattice decision, the set diff, and the history
 //! fold. The disk-backed halves (`plan_grant`, `rollback_inputs`) are driven end to end by the CLI and
 //! native-host suites.

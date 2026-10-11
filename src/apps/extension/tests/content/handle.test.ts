@@ -1,4 +1,3 @@
-// tier: pr
 // The content script's trust boundary (lib/content/handle.ts): every message
 // is parsed ONCE against ContentMsgSchema, page-acting ops are refused
 // without their guard, the origin binding is enforced unconditionally, and

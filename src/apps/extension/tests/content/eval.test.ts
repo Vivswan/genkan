@@ -1,4 +1,3 @@
-// tier: pr
 // The content-script eval leg executes and serializes ONLY: the settings
 // gate and confirmation run in the SW before the message arrives, and
 // masking happens SW-side on egress (tests/background/egress.test.ts). These

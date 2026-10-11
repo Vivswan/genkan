@@ -1,4 +1,3 @@
-// tier: pr
 // The gate's negative controls: docker compose accepts every key below and podman-compose ignores or
 // rejects it, and no engine fails a compose file over them, so only this check can. The cases are the
 // known-divergent keys and the two ways a mount option could reach the engine unseen; the portable

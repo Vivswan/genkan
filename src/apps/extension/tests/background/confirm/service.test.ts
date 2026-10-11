@@ -1,4 +1,3 @@
-// tier: pr
 // The confirmation service's fail-closed contract, driven with a fake
 // provider (no browser window needed). What CANNOT be tested here: the real
 // popup window; the isolated-browser suite proves the guarded page cannot

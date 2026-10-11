@@ -1,4 +1,3 @@
-# tier: pr
 """End-to-end protocol tests for genkan.
 
 Each case drives the release binary as real subprocesses: the MCP server over

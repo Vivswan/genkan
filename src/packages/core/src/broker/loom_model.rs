@@ -1,4 +1,3 @@
-// tier: pr
 use super::RefCount;
 use loom::sync::Arc;
 use loom::thread;

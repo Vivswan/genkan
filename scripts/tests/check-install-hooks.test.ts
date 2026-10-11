@@ -1,4 +1,3 @@
-// tier: pr
 import { afterEach, describe, expect, test } from "bun:test";
 import { installHooks } from "../check-install-hooks";
 import { Scratch, writeTree } from "../lib.ts";

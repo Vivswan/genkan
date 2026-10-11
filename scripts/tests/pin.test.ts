@@ -1,4 +1,3 @@
-// tier: pr
 // The one-owner rule spans two files of different grammars, and neither proto nor Docker enforces it: proto
 // reads .prototools alone, Docker reads the Containerfile alone and lets the last of two ARG lines win.
 

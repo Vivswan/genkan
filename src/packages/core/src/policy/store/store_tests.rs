@@ -1,4 +1,3 @@
-// tier: pr
 use std::fs;
 
 use super::*;

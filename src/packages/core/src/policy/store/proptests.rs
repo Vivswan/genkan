@@ -1,4 +1,3 @@
-// tier: pr
 use proptest::prelude::*;
 
 use super::{next_revision, PolicyWriteError, JS_SAFE_INT_MAX};

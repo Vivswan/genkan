@@ -1,4 +1,3 @@
-// tier: pr
 // The rules scripts/gen-schema.ts holds every emitted validator to, each shown firing on the schema it exists
 // to refuse, and the external facts the emission leans on: which keywords json-schema-to-zod reads, and what
 // json-schema-to-typescript makes of the node shapes the generators produce. Every case goes through the real

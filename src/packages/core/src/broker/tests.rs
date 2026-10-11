@@ -1,4 +1,3 @@
-// tier: pr
 use super::*;
 
 use crate::allowlist::{Anchor, ClientEntry, ClientName};

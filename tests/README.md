@@ -29,15 +29,15 @@ The protocol suites and the integration test's MCP leg track the MCP 2026-07-28 
 
 ## Tiers
 
-The first line of every test file names when it runs (`// tier: pr`, or `# tier: pr` in Python), before the comment that says what would drift without it. A move cannot change a tier silently, and a census reads one line per file.
+Each suite runs in one of three places, and a suite that would fit both the pull-request gate and the release gate goes to the release gate: the pull-request gate holds only what every merge should wait for.
 
 | Tier | Runs on | Here |
 |------|---------|------|
 | `pr` | every pull request and push to main: `checks.yml`, inside the all-green gate | the unit suites, `protocol/e2e.py`, the browser suites `browser/run_all.ts` lists, `interop/sdk-client.test.ts`, the driver tests under `scripts/tests` and `harness/run.test.ts` |
 | `release-gate` | the release PR, a manual dispatch, and the nightly schedule: `release-gate.yml` | `protocol/adversarial.py`, `protocol/chaos.py`, the harness smoke (`harness/run.ts`), the installers |
-| `nightly` | the schedule only (`nightly.yml`, `nightly-fuzz.yml`), never a gate | mutation testing, the browser and audit reruns against that day's Chrome and advisory database, fuzzing |
+| `nightly` | the schedule, or a manual dispatch (`nightly.yml`, `nightly-fuzz.yml`), never a gate | mutation testing, the browser and audit reruns against that day's Chrome and advisory database, fuzzing |
 
-A suite that fits both `pr` and `release-gate` is `release-gate`: `pr` holds only what every merge should wait for. A file no workflow runs carries no tier: `browser/presence_exchange_test.ts` and `browser/integration_e2e.ts` run by hand (`moon run test-presence-exchange`, `moon run test-integration`).
+`browser/presence_exchange_test.ts` and `browser/integration_e2e.ts` run in no workflow: by hand, through `moon run test-presence-exchange` and `moon run test-integration`.
 
 ## ⚠ Safety - never point browser tests at your daily Chrome
 

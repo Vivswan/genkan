@@ -1,4 +1,3 @@
-// tier: pr
 // Named incident: CI checks runs 37163429917 and 37163904223. connect read
 // /json/list once, before headless Chrome listed its initial tab. A fake
 // /json/list stands in for Chrome; no browser is launched.

@@ -1,4 +1,3 @@
-// tier: pr
 import { describe, expect, test } from "vitest";
 import {
   globToPermissionPattern,

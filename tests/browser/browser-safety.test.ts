@@ -1,4 +1,3 @@
-// tier: pr
 // Unit tests for the isolation guard and the suite-ran canary in browser-safety.ts. No browser is
 // launched here: the guard's browsers are stub scripts that print a version line, and the canary
 // runs as a real subprocess with CHROME_BIN unset, so this file is safe to run anywhere (CI runs it

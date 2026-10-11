@@ -1,4 +1,3 @@
-// tier: pr
 // The CdpSession lifecycle state machine: a session is exactly detached,
 // attaching, or attached - one value. These guards pin the interleaving the
 // old attached-boolean + attaching-promise pair got wrong: a detach during

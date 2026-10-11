@@ -1,4 +1,3 @@
-// tier: pr
 // The unpinned window-approval surface (policy-approval.ts), driven END TO END
 // through the real confirmation service with a fake provider (the
 // service.test.ts idiom - no browser window) and the real policy-sync accept

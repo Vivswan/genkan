@@ -1,4 +1,3 @@
-// tier: pr
 import {
   CHALLENGE_DOMAIN,
   MAX_CONTEXT_BYTES,

@@ -1,4 +1,3 @@
-// tier: pr
 /**
  * Third-party interop: drives the release binary over stdio with the official TypeScript MCP client SDK v2
  * (@modelcontextprotocol/client, spec revision 2026-07-28), the one real modern client available, so the served

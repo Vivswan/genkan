@@ -1,4 +1,3 @@
-// tier: pr
 // The one host round trip, pinned to the protocol facts the host side relies on and the source cannot express:
 // control frames carry no ids, the host answers in order on one pipe, and an unanswered frame is a refusal at
 // the deadline, never a hang. A detach-then-attach leaves nothing from the old connection (its waiter, its

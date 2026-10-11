@@ -1,4 +1,3 @@
-// tier: pr
 // The pre-attach info toast decode (background/precise.ts): the reply is
 // parsed into a three-variant outcome, so a user's Cancel actually prevents
 // the debugger attach (it used to be dead code behind truthiness sniffing),

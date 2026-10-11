@@ -1,4 +1,3 @@
-# tier: release-gate
 """Fault-injection / chaos suite for genkan's runtime paths.
 
 The e2e suite drives the happy path. Real bugs hide in the other paths: a peer

@@ -1,4 +1,3 @@
-// tier: pr
 //! The exchange driven end to end with a software authenticator built to the WebAuthn layouts (nothing
 //! captured from a real one): enrollment on a fresh machine, the kill release behind an assertion, and every
 //! refusal the host owes a replayed, misdirected, or unenrolled answer.

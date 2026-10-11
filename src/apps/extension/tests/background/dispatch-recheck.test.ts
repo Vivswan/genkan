@@ -1,4 +1,3 @@
-// tier: pr
 // The post-confirmation tab re-validation (dispatch.recheckTab): a tab that
 // navigated to a DIFFERENT origin while a confirmation was open must fail
 // closed; same-origin navigation (SPA route change) passes and the FRESH tab

@@ -1,4 +1,3 @@
-// tier: pr
 //! `write_corpus` into a directory that holds nothing yet, the shape of a fresh checkout: every file
 //! under `seeds/` and `dictionaries/` is generated and gitignored, so the nightly job's first step
 //! runs where neither directory exists. The incident: once the last tracked file left `dictionaries/`,

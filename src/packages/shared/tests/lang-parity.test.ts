@@ -1,4 +1,3 @@
-// tier: pr
 // The shared-language enum exists on both sides of the process boundary as
 // hand-kept copies: language is browser-owned, so it is NOT generated into the
 // Rust core the way the policy schema is. UI_LANGUAGES in settings.ts is the

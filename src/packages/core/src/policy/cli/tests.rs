@@ -1,4 +1,3 @@
-// tier: pr
 use super::*;
 use crate::enclave::base64_encode;
 use crate::policy::PolicyDoc;

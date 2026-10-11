@@ -1,4 +1,3 @@
-// tier: pr
 import { afterEach, describe, expect, test } from "bun:test";
 import { toolchainMismatches } from "../check-toolchain";
 import { Scratch, writeTree } from "../lib";

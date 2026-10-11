@@ -1,4 +1,3 @@
-// tier: pr
 // The native-messaging boundary, exercised adversarially: parseBridgeReq must
 // refuse anything that is not a well-formed, catalogued, correctly-argued
 // bridge request - and must keep working for everything the host actually

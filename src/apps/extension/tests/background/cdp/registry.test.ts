@@ -1,4 +1,3 @@
-// tier: pr
 // The CDP session registry's teardown listener is policy-driven: an
 // accepted policy push whose effective cdpMode is false must tear live
 // sessions down on the PUSH path (the accepted push writes the policy

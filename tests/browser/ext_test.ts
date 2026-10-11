@@ -1,4 +1,3 @@
-// tier: pr
 /**
  * Extension smoke test via puppeteer - launches a REAL Chrome with our
  * extension loaded in a throwaway profile and verifies the extension

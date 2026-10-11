@@ -1,4 +1,3 @@
-// tier: pr
 // The generated manifest's SECURITY SURFACE, asserted at its source
 // (wxt.config.ts). scripts/check-extension-id.ts re-asserts the same surface
 // on the BUILT build/extension/chrome-mv3/manifest.json artifact, so drift

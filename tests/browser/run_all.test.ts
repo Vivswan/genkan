@@ -1,4 +1,3 @@
-// tier: pr
 // The runner's two CI switches are environment variables, and the shell's way of unsetting one is an empty
 // value (`GENKAN_BROWSER_CANARY_DIR= bun run_all.ts`). The landing review found that an empty value was read
 // as a caller-named dir "" on one line and as unset on another, so a fully passing run exited 1 with every

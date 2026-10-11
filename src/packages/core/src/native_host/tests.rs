@@ -1,4 +1,3 @@
-// tier: pr
 use super::*;
 use crate::protocol::BRIDGE_MAX_LINE;
 use crate::runtime_record::RuntimeRecord;

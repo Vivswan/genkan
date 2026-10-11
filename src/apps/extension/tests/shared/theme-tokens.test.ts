@@ -1,4 +1,3 @@
-// tier: pr
 // The Control Tower token layer exists as hand-synchronized copies: the
 // extension stylesheet (the canonical one), the TypeScript mirror for
 // CSS-less contexts (theme-colors.ts), and the landing page's palette blocks

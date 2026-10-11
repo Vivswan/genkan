@@ -1,4 +1,3 @@
-// tier: pr
 // Internal consistency of the generated catalogue (generated/ops.ts): the per-op
 // validators, the envelope-level OpArgs union, and the inferred BridgeCommand
 // types must all agree with each other. The catalogue's SOURCE is the Rust

@@ -1,4 +1,3 @@
-// tier: pr
 // The native-link state machine (background/port.ts): the link is exactly
 // one of connected / reconnect-scheduled / down, held as one value, and every
 // module bound to it attaches and detaches through the collaborator registry

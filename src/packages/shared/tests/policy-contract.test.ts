@@ -1,4 +1,3 @@
-// tier: pr
 // Semantics of the generated policy contract (generated/policy.ts): the deny
 // baseline, the direction table, the salvage posture, and the strict
 // document validator. The SOURCE is the Rust core

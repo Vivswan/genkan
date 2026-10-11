@@ -1,4 +1,3 @@
-// tier: pr
 import { ENCLAVE_FIXTURE_KEY_ID } from "@genkan/shared/generated/enclave";
 import { ENCLAVE_GOLDEN_FIXTURE } from "@genkan/shared/generated/enclave-fixture";
 import { POLICY_DEFAULTS } from "@genkan/shared/generated/policy";

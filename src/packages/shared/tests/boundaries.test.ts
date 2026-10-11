@@ -1,4 +1,3 @@
-// tier: pr
 // The popup/options message boundary and the storage-record schemas, exercised adversarially: unknown types,
 // malformed payloads, and corrupt records must all be refused or degraded, never interpreted.
 

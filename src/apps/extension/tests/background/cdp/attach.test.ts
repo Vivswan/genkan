@@ -1,4 +1,3 @@
-// tier: pr
 // withCdpAttach: the single owner of the reuse-or-attach / conditional-
 // detach protocol the debugger-backed ops used to repeat by hand. The guard
 // that matters: a transient attach is detached on EVERY exit path, and the

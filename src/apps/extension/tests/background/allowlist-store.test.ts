@@ -1,4 +1,3 @@
-// tier: pr
 // Central allowlist add-validation (defense-in-depth: not UI-only). A
 // submitted URL is reduced to a bare origin glob for an http(s) origin;
 // anything else is refused so a malformed entry no ensureAllowed check would

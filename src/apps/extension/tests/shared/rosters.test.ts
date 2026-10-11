@@ -1,4 +1,3 @@
-// tier: pr
 // Roster drift guards (the cloud-speech roster-sync pattern): every entry in
 // the generated catalogue must be owned by exactly one handling surface, and
 // every Chrome permission the catalogue needs must be granted by the

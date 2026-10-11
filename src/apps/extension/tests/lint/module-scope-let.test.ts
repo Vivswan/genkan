@@ -1,4 +1,3 @@
-// tier: pr
 // @vitest-environment node
 //
 // Biome's GritQL matches Biome's own CST node names, and Biome renames or reshapes nodes between versions; a renamed
