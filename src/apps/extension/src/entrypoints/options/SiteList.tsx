@@ -42,13 +42,18 @@ export function SiteList() {
       return;
     }
     // The host permission is requested here, inside the click or Enter (a user gesture, which MV3 requires
-    // for permissions.request and which the service worker never has); a declined prompt persists nothing.
+    // for permissions.request and which the service worker never has). A grant this click obtained is
+    // handed back when the worker fails to persist its entry; one held before the click is left alone.
     const pattern = globToPermissionPattern(glob);
-    const granted =
-      pattern !== null &&
-      (await browser.permissions.request({ origins: [pattern] }).catch(() => false));
+    if (pattern === null) {
+      setNote(t("settings.add_site_parse_failed"));
+      return;
+    }
+    const origins = { origins: [pattern] };
+    const heldBefore = await browser.permissions.contains(origins).catch(() => false);
+    const granted = await browser.permissions.request(origins).catch(() => false);
     if (!granted) {
-      setNote(t("settings.add_site_permission_declined"));
+      setNote(t("settings.add_site_permission_not_granted"));
       return;
     }
     const resp = await send({ type: "add_allow", glob });
@@ -56,6 +61,9 @@ export function SiteList() {
       setValue("");
       setNote("");
       void refresh();
+    } else {
+      if (!heldBefore) await browser.permissions.remove(origins).catch(() => {});
+      setNote(resp.error);
     }
   };
 

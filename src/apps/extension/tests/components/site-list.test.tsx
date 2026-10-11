@@ -1,7 +1,9 @@
 // MV3 grants browser.permissions.request only inside a user gesture, which the service worker that persists
-// the allowlist never has, so the options page must ask for the host permission inside the Add click and
-// persist nothing when the prompt is declined; a site that reaches the list without its permission fails at
-// injection with no visible reason.
+// the allowlist never has, so the options page must ask for the host permission inside the Add click, persist
+// nothing when the prompt is not granted, and hand back a grant this click obtained when the worker fails
+// to persist its entry (one held before the click stays): a site that reaches the list without its
+// permission fails at injection with no visible reason, and a grant without its entry is one the allowlist
+// does not name.
 
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -10,6 +12,9 @@ import { fakeBrowser } from "wxt/testing/fake-browser";
 
 let sent: Array<{ type: string; glob?: string }>;
 let request: ReturnType<typeof vi.fn>;
+let remove: ReturnType<typeof vi.fn>;
+let heldBefore: boolean;
+let addReply: () => unknown;
 
 beforeEach(() => {
   fakeBrowser.reset();
@@ -24,7 +29,9 @@ beforeEach(() => {
     settings_add_site_placeholder: { message: "https://example.com/*" },
     settings_add_site_format: { message: "Format should be https://host/*" },
     settings_add_site_parse_failed: { message: "Could not parse the URL" },
-    settings_add_site_permission_declined: { message: "Permission declined; nothing was added." },
+    settings_add_site_permission_not_granted: {
+      message: "Permission not granted; nothing was added.",
+    },
   };
   vi.stubGlobal(
     "fetch",
@@ -33,10 +40,17 @@ beforeEach(() => {
   vi.spyOn(fakeBrowser.runtime, "sendMessage").mockImplementation(async (msg: unknown) => {
     const m = msg as { type: string; glob?: string };
     sent.push(m);
-    return m.type === "get_allowlist" ? { ok: true, list: [] } : { ok: true, list: [m.glob] };
+    return m.type === "get_allowlist" ? { ok: true, list: [] } : addReply();
   });
+  addReply = () => ({ ok: true, list: ["https://example.com/*"] });
   request = vi.fn();
-  (fakeBrowser as unknown as Record<string, unknown>).permissions = { request };
+  remove = vi.fn(async () => true);
+  heldBefore = false;
+  (fakeBrowser as unknown as Record<string, unknown>).permissions = {
+    request,
+    remove,
+    contains: async () => heldBefore,
+  };
 });
 
 afterEach(() => {
@@ -58,7 +72,7 @@ describe("SiteList add", () => {
     ["granted: the glob is persisted", async () => true, true],
     ["declined: nothing is persisted and the note says so", async () => false, false],
     [
-      "the prompt throws: treated as declined",
+      "the prompt throws: treated as not granted",
       async () => Promise.reject(new Error("no gesture")),
       false,
     ],
@@ -75,8 +89,27 @@ describe("SiteList add", () => {
       );
       expect(screen.queryByRole("alert")).toBeNull();
     } else {
-      await screen.findByText("Permission declined; nothing was added.");
+      await screen.findByText("Permission not granted; nothing was added.");
       expect(adds()).toEqual([]);
     }
+    expect(remove).not.toHaveBeenCalled();
+  });
+
+  const failures: [label: string, held: boolean, removed: boolean][] = [
+    [
+      "a grant this click obtained is handed back when the worker cannot persist the entry",
+      false,
+      true,
+    ],
+    ["a grant held before the click stays when the worker cannot persist the entry", true, false],
+  ];
+  test.each(failures)("%s", async (_label, held, removed) => {
+    heldBefore = held;
+    request.mockImplementation(async () => true);
+    addReply = () => ({ ok: false, error: "could not persist the allowlist" });
+    await addSite("https://example.com/path");
+    await screen.findByText("could not persist the allowlist");
+    if (removed) expect(remove).toHaveBeenCalledWith({ origins: ["https://example.com/*"] });
+    else expect(remove).not.toHaveBeenCalled();
   });
 });
