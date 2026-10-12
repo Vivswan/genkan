@@ -4,7 +4,7 @@ This page is the local dev loop, the toolchain, the test and fuzz machinery, and
 
 ## Prerequisites
 
-[proto](https://moonrepo.dev/proto) is the bootstrap toolchain manager: install it once, put `~/.proto/shims` and `~/.proto/bin` on your PATH, and one `proto install` in a fresh checkout provisions every tool pinned in the repo-root `.prototools` (bun, moon, node, uv).
+[proto](https://moonrepo.dev/proto) is the bootstrap toolchain manager: install it once, put `~/.proto/shims` and `~/.proto/bin` on your PATH, and one `proto install` in a fresh checkout provisions every tool pinned in the repo-root `.prototools` (moon, node, uv) and the bun that `.bun-version` names.
 
 Rust is rustup's alone, from `rust-toolchain.toml`, so a fresh machine needs [rustup.rs](https://rustup.rs) first. proto deliberately leaves rust to it: proto's rust plugin registers a toolchain that rustup then believes is installed. Then:
 
@@ -21,10 +21,10 @@ Four tools have no first-party proto plugin and are installed once by hand: `car
 
 | Tool | Used for | Notes |
 |------|----------|-------|
-| [proto](https://moonrepo.dev/proto) | toolchain bootstrap | provisions everything pinned in `.prototools`, locally and in CI (`.github/actions/setup-moon`); the one pin that also lives elsewhere (bun) is cross-checked by `moon run check-toolchain` |
+| [proto](https://moonrepo.dev/proto) | toolchain bootstrap | provisions everything pinned in `.prototools` and the `.bun-version` bun, locally and in CI (`.github/actions/setup-moon`); `moon run check-toolchain` keeps bun, rust, and python at one pin each |
 | [moon](https://moonrepo.dev) | task runner | the canonical command interface: every dev task is a moon task. `moon run help` lists them; `moon run <task>` runs one |
 | Rust (cargo) | the `genkan` binary | pinned by `rust-toolchain.toml` (the authoritative pin; rustup and IDEs read it); `rustfmt` + `clippy` components, `cargo-nextest` as the test runner |
-| bun | everything TypeScript | package manager, script runner, extension bundling, TS test suites. Pinned in `.prototools` (and mirrored in `package.json` `packageManager`) |
+| bun | everything TypeScript | package manager, script runner, extension bundling, TS test suites. Pinned in `.bun-version` alone (platform-managed) |
 | node | the vitest suites (`extension:test`) | pinned only in `.prototools`; proto provisions it, so no job or image installs its own |
 | [`uv`](https://docs.astral.sh/uv/) | protocol e2e tests | provisions the exact Python pinned in the repo-root `.python-version`, so local runs and CI use the same interpreter. uv itself is pinned only in `.prototools`. The suites are stdlib-only |
 | Chrome | DOM + smoke tests | `CHROME_BIN` overrides the path |
@@ -171,11 +171,11 @@ What stays out of every hash:
 
 ## Toolchain pinning (proto)
 
-`.prototools` pins proto itself, bun, moon, node, and uv; `proto install` provisions them all, and rust comes from `rust-toolchain.toml` through rustup alone. CI provisions the same way through one composite action, `.github/actions/setup-moon`, used by every repo-owned job that needs a toolchain:
+`.prototools` pins proto itself, moon, node, and uv; `proto install` provisions them and the bun it detects from `.bun-version`, and rust comes from `rust-toolchain.toml` through rustup alone. CI provisions the same way through one composite action, `.github/actions/setup-moon`, used by every repo-owned job that needs a toolchain:
 
 1. `setup-bun` installs the `.bun-version` bun, only to run the pin reader.
 2. `bun scripts/pin.ts proto` reads proto's own version, the one pin `moonrepo/setup-toolchain` cannot read.
-3. That action installs proto, and `proto install` provisions the `.prototools` tools (its bun lands on top of the first, so a bare runner carries two).
+3. That action installs proto, and `proto install` provisions the `.prototools` tools and the `.bun-version` bun (the same bun again, under proto's shims, so a bare runner carries two installs of one version).
 4. With `cargo: "true"`, `setup-rust-toolchain` installs rust from `rust-toolchain.toml`.
 
 The container image (`Containerfile`) runs the same `proto install` at build time, with the proto version arriving as its one build arg (`scripts/compose-run.ts` computes it with `bun scripts/pin.ts proto`).
@@ -184,12 +184,10 @@ The container image (`Containerfile`) runs the same `proto install` at build tim
 
 | Tools | Owner file | Line shape |
 |-------|------------|------------|
-| proto, bun, moon, node, uv | `.prototools` | `tool = "x.y.z"` |
+| proto, moon, node, uv | `.prototools` | `tool = "x.y.z"` |
 | cargo-nextest, typos, actionlint, cargo-machete (the image's tools) and cargo-deb (the release and installer runners') | `Containerfile` | `ARG <TOOL>_VERSION=x.y.z` |
 
-One pin also lives in a second file, and `moon run check-toolchain` (part of the gate and of CI's `moon run hygiene` row) fails if the copies disagree, or if `.prototools` ever pins rust or enables proto's rust or python plugin:
-
-- **bun**: mirrored in `package.json` `packageManager` and the template-managed `.bun-version`.
+`moon run check-toolchain` (part of the gate and of CI's `moon run hygiene` row) fails if `.prototools` pins bun (proto would read that pin ahead of `.bun-version`), pins rust, or enables proto's rust or python plugin.
 
 uv is pinned only in `.prototools`, and python is owned by uv: the protocol suites run under the interpreter pinned in `.python-version` via `uv run --no-project --isolated`. proto deliberately never provisions python (`settings.builtin-plugins` in `.prototools`).
 
@@ -222,7 +220,7 @@ Every job runs on a GitHub-hosted runner, already isolated, so CI never uses the
 | `harness-smoke` | `tests/harness/run.ts --require-any` with the current Claude Code and Codex releases installed unpinned; the captures are the run's artifact | ubuntu runner |
 | `installers` | `installers.yml` builds the .pkg, .deb, and .msi and installs each on its runner | each platform's runner |
 
-`container-build.yml` is the one place CI touches Docker: it builds the `Containerfile` without pushing, only on a pull request or main push that changes the `Containerfile`, `.dockerignore`, `compose.yaml`, `compose.podman.yaml`, `.prototools`, `rust-toolchain.toml`, or the workflow itself. It is not in all-green's needs, so its skip on every other change costs nothing.
+`container-build.yml` is the one place CI touches Docker: it builds the `Containerfile` without pushing, only on a pull request or main push that changes the `Containerfile`, `.dockerignore`, `compose.yaml`, `compose.podman.yaml`, `.prototools`, `.bun-version`, `rust-toolchain.toml`, or the workflow itself. It is not in all-green's needs, so its skip on every other change costs nothing.
 
 ## Working on the extension
 

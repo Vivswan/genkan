@@ -5,66 +5,38 @@ import { Scratch, writeTree } from "../lib";
 const scratch = new Scratch();
 afterEach(() => scratch.remove());
 
-// The bun pin lives in three files no tool cross-checks for us (.prototools, package.json's packageManager,
-// the template-managed .bun-version), and proto's allow-list must leave python to uv and rust to rustup.
+// What would drift silently: proto reads .prototools before a tool's own version file, so a bun pin there
+// would replace the platform-managed .bun-version with no failure anywhere; and proto's allow-list must
+// leave python to uv and rust to rustup, or two provisioners own one tool.
 describe("toolchainMismatches", () => {
   const prototools = (pins: string, settings = '[settings]\nbuiltin-plugins = ["bun", "moon"]\n') =>
     `# the header comment\n${pins}\n${settings}`;
-  const agreeing = {
-    ".prototools": prototools('proto = "0.1.0"\nbun = "1.2.3"\n'),
-    "package.json": '{ "name": "x", "packageManager": "bun@1.2.3" }\n',
-    ".bun-version": "1.2.3\n",
-  };
-  const cases: ReadonlyArray<
-    readonly [name: string, files: Partial<typeof agreeing>, mismatches: string[]]
-  > = [
-    ["every copy agrees", {}, []],
+  const cases: ReadonlyArray<readonly [name: string, prototools: string, mismatches: string[]]> = [
+    ["one pin per tool", prototools('proto = "0.1.0"\n'), []],
     [
-      "package.json pins another bun",
-      { "package.json": '{ "packageManager": "bun@1.2.4" }' },
-      [".prototools bun (1.2.3) != package.json packageManager (1.2.4)"],
-    ],
-    [
-      "packageManager is not a bun pin",
-      { "package.json": '{ "packageManager": "pnpm@9.0.0" }' },
-      ["package.json packageManager (pnpm@9.0.0) is not a bun pin"],
-    ],
-    [
-      ".bun-version lags",
-      { ".bun-version": "1.2.2\n" },
-      [".prototools bun (1.2.3) != .bun-version (1.2.2)"],
-    ],
-    [
-      ".prototools has no bun pin",
-      { ".prototools": prototools('proto = "0.1.0"\n') },
+      ".prototools pins bun",
+      prototools('proto = "0.1.0"\nbun = "1.2.3"\n'),
       [
-        ".prototools does not pin bun",
-        ".prototools bun (<missing>) != package.json packageManager (1.2.3)",
-        ".prototools bun (<missing>) != .bun-version (1.2.3)",
+        ".prototools pins bun - .bun-version is its only pin (proto detects it, and a .prototools pin overrides it silently)",
       ],
     ],
     [
       ".prototools pins rust",
-      { ".prototools": prototools('proto = "0.1.0"\nbun = "1.2.3"\nrust = "1.80.0"\n') },
+      prototools('proto = "0.1.0"\nrust = "1.80.0"\n'),
       [
         ".prototools pins rust - rust-toolchain.toml is its only pin (proto's install breaks rustup's)",
       ],
     ],
     [
       "the allow-list is missing",
-      { ".prototools": prototools('proto = "0.1.0"\nbun = "1.2.3"\n', "") },
+      prototools('proto = "0.1.0"\n', ""),
       [
         ".prototools settings.builtin-plugins allow-list is missing (proto would provision python and rust)",
       ],
     ],
     [
       "the allow-list names the tools other provisioners own",
-      {
-        ".prototools": prototools(
-          'proto = "0.1.0"\nbun = "1.2.3"\n',
-          '[settings]\nbuiltin-plugins = ["bun", "python", "rust"]\n',
-        ),
-      },
+      prototools('proto = "0.1.0"\n', '[settings]\nbuiltin-plugins = ["bun", "python", "rust"]\n'),
       [
         ".prototools builtin-plugins includes python - python is owned by uv (.python-version)",
         ".prototools builtin-plugins includes rust - rust is owned by rustup (rust-toolchain.toml)",
@@ -72,9 +44,9 @@ describe("toolchainMismatches", () => {
     ],
   ];
 
-  test.each(cases)("%s", (_name, files, mismatches) => {
+  test.each(cases)("%s", (_name, file, mismatches) => {
     const root = scratch.dir("toolchain");
-    writeTree(root, { ...agreeing, ...files });
+    writeTree(root, { ".prototools": file });
     expect(toolchainMismatches(root)).toEqual(mismatches);
   });
 });

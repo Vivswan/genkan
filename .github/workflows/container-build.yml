@@ -16,6 +16,7 @@ on:
       - compose.yaml
       - compose.podman.yaml
       - .prototools
+      - .bun-version
       - rust-toolchain.toml
       - .github/workflows/container-build.yml
   push:
@@ -26,6 +27,7 @@ on:
       - compose.yaml
       - compose.podman.yaml
       - .prototools
+      - .bun-version
       - rust-toolchain.toml
       - .github/workflows/container-build.yml
 

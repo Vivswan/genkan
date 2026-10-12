@@ -579,7 +579,7 @@ tasks:
       mutex: 'generated-contract'
 
   check-toolchain:
-    description: 'The bun pin copies (.prototools, package.json, .bun-version) must agree, and .prototools must leave rust to rustup and python to uv'
+    description: '.prototools must leave bun to .bun-version, rust to rustup, and python to uv'
     command: 'bun scripts/check-toolchain.ts'
 
   check-pins:
