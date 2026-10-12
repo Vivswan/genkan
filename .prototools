@@ -4,9 +4,9 @@
 # and CI's setup-rust-toolchain, and proto's rust plugin would register a toolchain without a rustc that
 # makes rustup believe the pin is installed.
 #
-# One pin is necessarily duplicated, and scripts/check-toolchain.ts (`moon run check-toolchain`, in the ci
-# gate) fails if the copies disagree:
-#   bun   package.json's packageManager field and the template-managed .bun-version.
+# bun is deliberately absent: the platform-managed .bun-version is its only pin. proto's bun plugin detects
+# that file on its own, `proto install` provisions what it detects, and a `bun = ` line here would override it
+# silently, so scripts/check-toolchain.ts (`moon run check-toolchain`, in the ci gate) refuses one.
 # uv keeps owning python: the protocol suites run under the interpreter pinned in .python-version via
 # `uv run --no-project --isolated`, so proto never provisions python (the allow-list below excludes it).
 #
@@ -14,7 +14,6 @@
 # cargo-nextest, typos, cargo-machete, actionlint. Install them once by hand (docs/development.md); the
 # container image carries pinned copies, and the managed ci.yml runs typos and actionlint through fleet actions.
 proto = "0.58.2"
-bun = "1.4.3"
 moon = "2.4.5"
 node = "24.21.0"
 uv = "0.11.26"

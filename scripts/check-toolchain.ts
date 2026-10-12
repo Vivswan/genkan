@@ -1,11 +1,11 @@
 #!/usr/bin/env bun
-// The one toolchain pin that lives in two files must agree, or local runs and CI use different tools:
-//   bun   .prototools vs package.json packageManager vs the template-managed .bun-version (what the
-//         platform's bun jobs run)
+// Every tool has one pin and one provisioner, or local runs and CI drift apart without a failure:
+//   bun     .bun-version (platform-managed); proto's bun plugin detects it, and a .prototools pin would
+//           override it silently, since proto reads .prototools before the tool's own version file
+//   rust    rust-toolchain.toml through rustup; proto's rust plugin registers a toolchain without a rustc
+//   python  .python-version through uv; proto's python plugin would be a second provisioner
 // proto, moon, node, and uv are pinned in .prototools alone and CI reads them from there
-// (.github/actions/setup-moon, the Containerfile); rust is pinned in rust-toolchain.toml alone. python
-// stays uv's (.python-version) and rust stays rustup's: proto's plugin allow-list must name neither, or
-// two provisioners own one tool.
+// (.github/actions/setup-moon, the Containerfile).
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -16,29 +16,20 @@ export function toolchainMismatches(root: string): string[] {
   const fail = (message: string): void => {
     mismatches.push(message);
   };
-  const read = (file: string): string => readFileSync(join(root, file), "utf8");
 
-  const prototools = Bun.TOML.parse(read(".prototools")) as Record<string, unknown>;
+  const prototools = Bun.TOML.parse(readFileSync(join(root, ".prototools"), "utf8")) as Record<
+    string,
+    unknown
+  >;
   // A pin is a top-level string; anything under a [table] is a setting, not a pin.
   const pin = (tool: string): string | undefined =>
     typeof prototools[tool] === "string" ? prototools[tool] : undefined;
-  const bunPin = pin("bun") ?? "<missing>";
-  if (pin("bun") === undefined) fail(".prototools does not pin bun");
 
-  const rootPkg = JSON.parse(read("package.json")) as { packageManager?: string };
-  const packageManager = rootPkg.packageManager ?? "";
-  const bunFromPkg = packageManager.match(/^bun@(.+)$/)?.[1];
-  if (!bunFromPkg) {
-    fail(`package.json packageManager (${packageManager}) is not a bun pin`);
-  } else if (bunPin !== bunFromPkg) {
-    fail(`.prototools bun (${bunPin}) != package.json packageManager (${bunFromPkg})`);
+  if (pin("bun") !== undefined) {
+    fail(
+      ".prototools pins bun - .bun-version is its only pin (proto detects it, and a .prototools pin overrides it silently)",
+    );
   }
-
-  const bunVersionFile = read(".bun-version").trim();
-  if (bunVersionFile !== bunPin) {
-    fail(`.prototools bun (${bunPin}) != .bun-version (${bunVersionFile})`);
-  }
-
   if (pin("rust") !== undefined) {
     fail(
       ".prototools pins rust - rust-toolchain.toml is its only pin (proto's install breaks rustup's)",

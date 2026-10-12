@@ -1,11 +1,12 @@
 # proto's own version is the one pin moonrepo/setup-toolchain cannot read from .prototools (it looks in
 # .moon/toolchains.yml), so scripts/pin.ts supplies it, which needs a bun first: setup-bun installs the
-# .bun-version one, and proto then installs the .prototools one on top (two bun installs, by design).
+# .bun-version one, and proto then detects the same .bun-version and installs it under its own shims
+# (two installs of one bun, by design).
 # rust is rustup's alone: proto's rust plugin registers a toolchain without a rustc, which makes
 # setup-rust-toolchain believe rust-toolchain.toml is already installed.
 name: Set up moon
 description: |
-  Installs proto, moon, and every tool .prototools pins on the runner. The step order lives in docs/development.md, "Toolchain pinning".
+  Installs proto, moon, every tool .prototools pins, and the .bun-version bun on the runner. The step order lives in docs/development.md, "Toolchain pinning".
 
   With cargo set to "true" it also installs rust from rust-toolchain.toml through rustup and restores the cargo cache for both cargo workspaces.
 

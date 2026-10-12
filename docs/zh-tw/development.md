@@ -4,7 +4,7 @@
 
 ## 先決條件
 
-[proto](https://moonrepo.dev/proto) 是啟動用的工具鏈管理器: 安裝一次, 把 `~/.proto/shims` 和 `~/.proto/bin` 加入 PATH, 之後在新簽出的儲存庫裡執行一次 `proto install`, 就會佈建儲存庫根目錄 `.prototools` 所固定的每個工具 (bun、moon、node、uv)。
+[proto](https://moonrepo.dev/proto) 是啟動用的工具鏈管理器: 安裝一次, 把 `~/.proto/shims` 和 `~/.proto/bin` 加入 PATH, 之後在新簽出的儲存庫裡執行一次 `proto install`, 就會佈建儲存庫根目錄 `.prototools` 所固定的每個工具 (moon、node、uv) 以及 `.bun-version` 指定的 bun。
 
 Rust 只由 rustup 管理, 來自 `rust-toolchain.toml`, 所以新機器要先安裝 [rustup.rs](https://rustup.rs)。proto 刻意把 rust 留給 rustup: proto 的 rust 外掛會註冊一個工具鏈, 而 rustup 隨後會誤以為它已安裝。接著:
 
@@ -21,10 +21,10 @@ moon run setup   # installs the bun workspace, the pinned Rust toolchain, and th
 
 | 工具 | 用途 | 備註 |
 |------|----------|-------|
-| [proto](https://moonrepo.dev/proto) | 工具鏈啟動 | 佈建 `.prototools` 固定的一切, 本機與 CI (`.github/actions/setup-moon`) 皆然; 唯一同時存在於別處的固定版本 (bun) 由 `moon run check-toolchain` 交叉檢查 |
+| [proto](https://moonrepo.dev/proto) | 工具鏈啟動 | 佈建 `.prototools` 固定的一切與 `.bun-version` 的 bun, 本機與 CI (`.github/actions/setup-moon`) 皆然; `moon run check-toolchain` 讓 bun、rust 與 python 各自只有一個固定版本 |
 | [moon](https://moonrepo.dev) | 任務執行器 | 標準的命令介面: 每個開發工作都是一個 moon 任務。`moon run help` 列出全部; `moon run <task>` 執行其中一個 |
 | Rust (cargo) | `genkan` 執行檔 | 由 `rust-toolchain.toml` 固定 (權威的固定來源; rustup 與 IDE 都讀它); `rustfmt` + `clippy` 元件, 以 `cargo-nextest` 作為測試執行器 |
-| bun | 所有 TypeScript | 套件管理器、指令碼執行器、擴充功能打包、TS 測試套件。固定於 `.prototools` (並鏡像到 `package.json` 的 `packageManager`) |
+| bun | 所有 TypeScript | 套件管理器、指令碼執行器、擴充功能打包、TS 測試套件。只固定於 `.bun-version` (由平台管理) |
 | node | vitest 測試套件 (`extension:test`) | 只固定於 `.prototools`; 由 proto 佈建, 所以沒有任何工作或映像檔自行安裝 |
 | [`uv`](https://docs.astral.sh/uv/) | 協定 e2e 測試 | 佈建儲存庫根目錄 `.python-version` 所固定的確切 Python 版本, 讓本機執行與 CI 使用同一個直譯器。uv 本身只固定於 `.prototools`。測試套件僅使用標準函式庫 |
 | Chrome | DOM + 冒煙測試 | `CHROME_BIN` 覆寫路徑 |
@@ -171,11 +171,11 @@ moon ci                    # affected-only, based on touched files - a LOCAL
 
 ## 工具鏈固定 (proto)
 
-`.prototools` 固定 proto 本身、bun、moon、node 與 uv; `proto install` 一次佈建全部, 而 rust 只透過 rustup 來自 `rust-toolchain.toml`。CI 以同樣方式佈建, 透過單一的複合 action `.github/actions/setup-moon`, 每個需要工具鏈的儲存庫自有工作都用它:
+`.prototools` 固定 proto 本身、moon、node 與 uv; `proto install` 一次佈建它們以及從 `.bun-version` 偵測到的 bun, 而 rust 只透過 rustup 來自 `rust-toolchain.toml`。CI 以同樣方式佈建, 透過單一的複合 action `.github/actions/setup-moon`, 每個需要工具鏈的儲存庫自有工作都用它:
 
 1. `setup-bun` 安裝 `.bun-version` 指定的 bun, 只用來執行固定版本讀取器。
 2. `bun scripts/pin.ts proto` 讀取 proto 自身的版本, 這是 `moonrepo/setup-toolchain` 唯一讀不到的固定版本。
-3. 該 action 安裝 proto, 接著 `proto install` 佈建 `.prototools` 的工具 (它的 bun 疊在第一個之上, 所以裸機執行器會有兩個)。
+3. 該 action 安裝 proto, 接著 `proto install` 佈建 `.prototools` 的工具與 `.bun-version` 的 bun (同一個 bun 再裝一次, 放在 proto 的 shims 下, 所以裸機執行器會有同一版本的兩份安裝)。
 4. 設定 `cargo: "true"` 時, `setup-rust-toolchain` 依 `rust-toolchain.toml` 安裝 rust。
 
 容器映像檔 (`Containerfile`) 在建置時執行同一個 `proto install`, proto 版本以它唯一的建置引數傳入 (`scripts/compose-run.ts` 以 `bun scripts/pin.ts proto` 計算)。
@@ -184,12 +184,10 @@ moon ci                    # affected-only, based on touched files - a LOCAL
 
 | 工具 | 擁有者檔案 | 行的格式 |
 |-------|------------|------------|
-| proto、bun、moon、node、uv | `.prototools` | `tool = "x.y.z"` |
+| proto、moon、node、uv | `.prototools` | `tool = "x.y.z"` |
 | cargo-nextest、typos、actionlint、cargo-machete (映像檔的工具) 與 cargo-deb (發行與安裝程式執行器的工具) | `Containerfile` | `ARG <TOOL>_VERSION=x.y.z` |
 
-有一個固定版本也存在於第二個檔案, 而 `moon run check-toolchain` (閘門與 CI 的 `moon run hygiene` 列的一部分) 會在兩份副本不一致, 或 `.prototools` 竟固定了 rust、啟用了 proto 的 rust 或 python 外掛時失敗:
-
-- **bun**: 鏡像於 `package.json` 的 `packageManager` 與範本管理的 `.bun-version`。
+若 `.prototools` 固定了 bun (proto 會先讀到那個固定版本, 而不是 `.bun-version`)、固定了 rust, 或啟用了 proto 的 rust 或 python 外掛, `moon run check-toolchain` (閘門與 CI 的 `moon run hygiene` 列的一部分) 就會失敗。
 
 uv 只固定於 `.prototools`, 而 python 由 uv 擁有: 協定測試套件透過 `uv run --no-project --isolated` 在 `.python-version` 固定的直譯器下執行。proto 刻意永不佈建 python (`.prototools` 中的 `settings.builtin-plugins`)。
 
@@ -222,7 +220,7 @@ uv 只固定於 `.prototools`, 而 python 由 uv 擁有: 協定測試套件透�
 | `harness-smoke` | 安裝未固定版本的目前 Claude Code 與 Codex 發行版後執行 `tests/harness/run.ts --require-any`; 擷取的訊框是該次執行的產物 | ubuntu 執行器 |
 | `installers` | `installers.yml` 建置 .pkg、.deb 與 .msi, 並在各自的執行器上安裝 | 各平台的執行器 |
 
-`container-build.yml` 是 CI 唯一觸及 Docker 的地方: 它只建置 `Containerfile` 而不推送, 且只在拉取請求或 main 推送變更了 `Containerfile`、`.dockerignore`、`compose.yaml`、`compose.podman.yaml`、`.prototools`、`rust-toolchain.toml` 或該工作流程本身時執行。它不在 all-green 的 needs 中, 所以在其他變更上被略過不花任何代價。
+`container-build.yml` 是 CI 唯一觸及 Docker 的地方: 它只建置 `Containerfile` 而不推送, 且只在拉取請求或 main 推送變更了 `Containerfile`、`.dockerignore`、`compose.yaml`、`compose.podman.yaml`、`.prototools`、`.bun-version`、`rust-toolchain.toml` 或該工作流程本身時執行。它不在 all-green 的 needs 中, 所以在其他變更上被略過不花任何代價。
 
 ## 開發擴充功能
 

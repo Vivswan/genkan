@@ -1,5 +1,6 @@
-# Build context for Containerfile: only the two files proto and rustup read natively. Everything else
+# Build context for Containerfile: only the three files proto and rustup read natively. Everything else
 # (node_modules, target, .git, the sources) reaches the container through compose.yaml's bind mount.
 *
 !.prototools
+!.bun-version
 !rust-toolchain.toml

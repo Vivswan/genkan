@@ -63,10 +63,10 @@ ENV HOME=/home/ci \
     BUN_INSTALL=/home/ci/.bun \
     PATH=/home/ci/.proto/shims:/home/ci/.proto/bin:/home/ci/.cargo/bin:/usr/local/bin:/usr/bin:/bin
 
-# proto and rustup read these two files natively. --chown: COPY writes root-owned entries whatever USER
+# proto and rustup read these three files natively (bun's pin is .bun-version alone). --chown: COPY writes root-owned entries whatever USER
 # is, and the ci user removes the directory below.
 WORKDIR /tmp/pins
-COPY --chown=ci:ci .prototools rust-toolchain.toml ./
+COPY --chown=ci:ci .prototools .bun-version rust-toolchain.toml ./
 
 # rustup owns rust: rust-toolchain.toml is its only pin (`rustup toolchain install` with no argument
 # installs the file's toolchain, profile and components included), and .prototools deliberately leaves
