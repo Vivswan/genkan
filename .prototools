@@ -14,7 +14,7 @@
 # cargo-nextest, typos, cargo-machete, actionlint. Install them once by hand (docs/development.md); the
 # container image carries pinned copies, and the managed ci.yml runs typos and actionlint through fleet actions.
 proto = "0.58.2"
-bun = "1.4.2"
+bun = "1.4.3"
 moon = "2.4.5"
 node = "24.21.0"
 uv = "0.11.26"

@@ -4,7 +4,7 @@
   "description": "Authenticated MCP bridge to your real Chromium browsers - bun workspace root.",
   "license": "SEE LICENSE IN LICENSE.md",
   "type": "module",
-  "packageManager": "bun@1.4.2",
+  "packageManager": "bun@1.4.3",
   "workspaces": [
     "src/apps/extension",
     "src/packages/*",
